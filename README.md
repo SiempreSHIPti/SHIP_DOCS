@@ -1,3 +1,9 @@
+# Fix Cloud Build Dockerfile
+
+Se agregó `Dockerfile`, `.dockerignore` y `cloudbuild.yaml` para corregir el error de Cloud Build que no encontraba `/workspace/Dockerfile`. Ver `README-FIX-CLOUDBUILD-DOCKERFILE.md`.
+
+---
+
 # Fix credencial formato PowerPoint
 
 La credencial PDF que se genera al guardar el registro ahora usa el formato del PowerPoint cargado como plantilla visual. Ver `README-FIX-CREDENCIAL-FORMATO-POWERPOINT.md`.

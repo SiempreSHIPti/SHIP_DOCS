@@ -113,12 +113,12 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "pptx_front_asset": true,
-  "pptx_back_asset": true,
-  "pptx_source_included": true,
-  "uses_template_background": true,
-  "uses_driver_photo_in_diamond": true,
-  "overlays_driver_name": true,
-  "overlays_back_values": true,
-  "page_size_template_ratio": true
+  "dockerfile_exists": true,
+  "dockerignore_exists": true,
+  "cloudbuild_exists": true,
+  "dockerfile_uses_node_20": true,
+  "dockerfile_runs_npm_ci": true,
+  "dockerfile_exposes_8080": true,
+  "start_script_exists": true,
+  "credential_assets_present": true
 }

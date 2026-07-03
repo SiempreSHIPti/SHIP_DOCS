@@ -1,0 +1,54 @@
+# Cloud Build para construir imagen y desplegar en Cloud Run.
+# Ajusta las sustituciones si tu servicio/región/repositorio tienen otro nombre.
+steps:
+  - id: "Build"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:$COMMIT_SHA"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:latest"
+      - "."
+
+  - id: "Push commit image"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:$COMMIT_SHA"
+
+  - id: "Push latest image"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:latest"
+
+  - id: "Deploy Cloud Run"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:$COMMIT_SHA"
+      - "--region=${_REGION}"
+      - "--platform=managed"
+      - "--allow-unauthenticated"
+      - "--port=8080"
+      - "--memory=1Gi"
+      - "--cpu=1"
+      - "--timeout=300"
+      - "--set-env-vars=NODE_ENV=production,PORT=8080"
+
+images:
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:$COMMIT_SHA"
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:latest"
+
+substitutions:
+  _REGION: "us-central1"
+  _AR_REPO: "ship-docs"
+  _IMAGE_NAME: "registro-documental"
+  _SERVICE_NAME: "ship-docs"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
