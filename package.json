@@ -1,0 +1,23 @@
+{
+  "name": "registro-documental",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "check": "node --check index.js && node --check src/server.js && node --check src/routes/submit.js && node --check src/routes/jobStatus.js && node --check src/routes/documentValidationRealtime.js && node --check src/routes/finalDocumentReview.js && node --check src/routes/saveLocalRegistration.js && node --check src/routes/draftLocalRegistration.js && node --check src/services/localExcelArchive.js && node --check src/services/localDraftStore.js && node --check src/services/processSubmission.js && node --check src/services/documentValidation.js && node --check src/middleware/upload.js && node --check src/middleware/security.js",
+    "dev:local": "node index.js",
+    "dev:ai-review-only": "node index.js"
+  },
+  "dependencies": {
+    "@google-cloud/documentai": "^9.5.0",
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "googleapis": "^137.1.0",
+    "mime-types": "^2.1.35",
+    "multer": "^1.4.5-lts.1",
+    "exceljs": "^4.4.0",
+    "pdfkit": "^0.15.0"
+  },
+  "description": "Registro documental con validación IA, guardado local en Excel y generación de credenciales."
+}

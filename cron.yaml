@@ -1,0 +1,5 @@
+# cron:
+# - description: "Sync Odoo employees from Sheets every 5 minutes"
+#   url: /tasks/sync-odoo-curp?key=cambia-esta-llave-super-secreta
+#   schedule: every 5 minutes
+#   target: default

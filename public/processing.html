@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Procesando información</title>
+  
+  <link rel="icon" href="img/Icon.png" type="image/png">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;700&family=Squada+One&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/processing.css" />
+</head>
+<body>
+  <div class="neon-glass-board">
+    <div class="board-left">
+      <img src="img/Logo-Rojo.png" alt="Logo SHIP" class="logo" />
+      <div class="id-box">
+        <p class="message">Tu ID de seguimiento es</p>
+        <code id="jid" class="tracking-code">—</code>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="board-right">
+      <div class="warning">⚠️ <span><strong>¡No cierres esta ventana!</strong> Espera hasta que termine el proceso.</span></div>
+
+      <h1 id="title">Estamos validando tus documentos…</h1>
+      
+      <div class="timer-pill">⏳ Tiempo transcurrido: <span id="elapsed" class="timer">00:00</span></div>
+
+      <div class="progress-wrap">
+        <div class="progress-bar" aria-hidden="true"><span></span></div>
+        <div class="status"><span class="dot"></span><span id="status-text">En cola de procesamiento…</span></div>
+      </div>
+
+      <div id="alert" class="alert" role="alert"></div>
+      <div id="validation-box" class="alert" role="status" style="display:none;"></div>
+
+      <div id="success" class="success" aria-live="polite">
+        <svg class="check" viewBox="0 0 52 52"><circle cx="26" cy="26" r="25" fill="none" stroke="#10b981" stroke-width="3"/><path d="M14.1 27.2l7.1 7.2 16.7-16.8" fill="none" stroke="#10b981" stroke-width="3"/></svg>
+        <h2>¡Envío exitoso!</h2>
+        <p id="success-msg">Documentos guardados correctamente. <strong>La validación continuará en segundo plano.</strong></p>
+        <div class="actions">
+          <button class="btn primary" id="go-home">Finalizar</button>
+          <button class="btn" id="copy-job">Copiar ID</button>
+        </div>
+      </div>
+
+      <div class="actions" id="error-actions" style="display:none;">
+        <button class="btn primary" id="go-home-err">Volver al inicio</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const jobId = qs.get('jobId') || '';
+    document.getElementById('jid').textContent = jobId || '—';
+
+    const titleEl = document.getElementById('title');
+    const statusEl = document.getElementById('status-text');
+    const elapsedEl = document.getElementById('elapsed');
+    const alertEl = document.getElementById('alert');
+    const validationBox = document.getElementById('validation-box');
+    const successBox = document.getElementById('success');
+    const errorActions = document.getElementById('error-actions');
+    const progressWrap = document.querySelector('.progress-wrap');
+    const timerPill = document.querySelector('.timer-pill');
+
+    // Cronómetro
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const s = Math.floor((Date.now() - started)/1000);
+      elapsedEl.textContent = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    }, 1000);
+    
+    function stopAll(){ clearInterval(timer); window.removeEventListener('beforeunload', beforeUnload); }
+    function setStatus(msg){ statusEl.textContent = msg; }
+    
+    function showError(msg){ 
+        stopAll(); 
+        setStatus('Proceso con errores.'); 
+        alertEl.innerHTML = `⚠️ <strong>Atención:</strong> ${msg}`; 
+        alertEl.style.display='block'; 
+        errorActions.style.display='flex'; 
+        progressWrap.style.display='none';
+    }
+    
+    function renderValidation(validation){
+      if(!validation || !validationBox) return;
+      const rows = Object.values(validation || {});
+      if(!rows.length) return;
+      const ok = rows.filter(x => x && x.ok).length;
+      const fail = rows.length - ok;
+      validationBox.style.display = 'block';
+      validationBox.innerHTML = `<strong>Validación documental IA:</strong> ${ok}/${rows.length} aprobados${fail ? ` · ${fail} por revisar` : ''}`;
+    }
+
+    function showSuccess(text){ 
+        stopAll(); 
+        titleEl.textContent='¡El envío de documentos fue exitoso!'; 
+        successBox.style.display='block'; 
+        progressWrap.style.display='none';
+        timerPill.style.display='none';
+        document.querySelector('.warning').style.display='none';
+        if(text) document.getElementById('success-msg').innerHTML = text; 
+    }
+
+    // Antes de salir
+    function beforeUnload(e){ e.preventDefault(); e.returnValue=''; }
+    window.addEventListener('beforeunload', beforeUnload);
+
+    document.getElementById('go-home').onclick = () => location.href = '/';
+    document.getElementById('go-home-err').onclick = () => location.href = '/';
+    document.getElementById('copy-job').onclick = async () => { try{ await navigator.clipboard.writeText(jobId || ''); }catch{} };
+
+    // Polling
+    const POLL_BASE_MS=2000, POLL_MAX_MS=10000, LIMIT_MIN=15;
+    let tries=0, backoff=POLL_BASE_MS, t0=Date.now();
+    async function poll(){
+      if(!jobId){ showError('No se encontró un ID de seguimiento.'); return; }
+      try{
+        const r = await fetch(`/api/job-status?jobId=${encodeURIComponent(jobId)}`, { cache:'no-store' });
+        if(r.ok){
+          const d = await r.json();
+          renderValidation(d.documentValidation);
+          if(d.state==='done' && d.ok!==false){
+            if (d.aiReviewOnly || d.saved === false) {
+              showSuccess('Revisión IA finalizada correctamente. <strong>No se guardó ni se envió información a Drive, Sheets, Apps Script, Odoo o BD.</strong>');
+            } else {
+              showSuccess('Documentos validados y guardados correctamente. <strong>La credencial se generará si aplica.</strong>');
+            }
+            return;
+          }
+          if(d.state==='error' || d.ok===false){ showError(d.message||'Ocurrió un problema durante el procesamiento.'); return; }
+          if(d.state==='processing') setStatus(d.message||'Procesando documentos…'); else setStatus(d.message||'En cola de procesamiento…');
+        }else{
+          setStatus(`Esperando estado (HTTP ${r.status})…`); tries++;
+        }
+      }catch{ setStatus('Conexión inestable, reintentando…'); tries++; }
+      if((Date.now()-t0)/60000 > LIMIT_MIN){ showError('No pudimos confirmar el resultado. Vuelve al inicio e inténtalo más tarde.'); return; }
+      backoff = Math.min(POLL_MAX_MS, POLL_BASE_MS * Math.pow(1.5, Math.min(tries,8)));
+      setTimeout(poll, backoff);
+    }
+    poll();
+  </script>
+</body>
+</html>

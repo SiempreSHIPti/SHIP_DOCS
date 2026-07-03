@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal de Documentos</title>
+  
+  <link rel="icon" href="img/Icon.png" type="image/png">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;700&family=Squada+One&display=swap" rel="stylesheet">
+  <link href="css/home.css" rel="stylesheet">
+
+  <style>
+    .file-status {
+      font-size: 12px;
+      margin-top: 7px;
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      font-weight: 600;
+      line-height: 1.35;
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .file-status.is-selected { color: var(--accent, #ef1235); }
+    .file-status.is-validating { color: #f59e0b; }
+    .file-status.is-ok { color: #10b981; }
+    .file-status.is-error { color: #ef4444; }
+    .file-status .mini-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 999px;
+      display: inline-block;
+      flex: 0 0 auto;
+      animation: fileSpin .8s linear infinite;
+      margin-top: 1px;
+    }
+    .file-status .status-icon {
+      flex: 0 0 auto;
+      margin-top: 1px;
+    }
+    .file-status small {
+      display: block;
+      opacity: .9;
+      font-weight: 500;
+      margin-top: 2px;
+    }
+    @keyframes fileSpin { to { transform: rotate(360deg); } }
+  </style>
+
+
+  <style>
+    .resume-actions-card {
+      margin-bottom: 18px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: linear-gradient(135deg, rgba(248,0,32,.12), rgba(255,255,255,.035));
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,.12);
+    }
+    .resume-actions-card h3 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      letter-spacing: .2px;
+    }
+    .resume-actions-card p {
+      margin: 0 0 14px;
+      color: rgba(255,255,255,.72);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .resume-actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .btn-outline-soft {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: #fff;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-outline-soft:hover { background: rgba(255,255,255,.10); }
+    .resume-box {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(0,0,0,.26);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+    .resume-box.active { display: block; }
+    .resume-inline {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .resume-note {
+      margin-top: 10px;
+      color: rgba(255,255,255,.68);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .review-screen {
+      display: none;
+      margin-top: 18px;
+      padding: 20px;
+      border-radius: 24px;
+      background: rgba(7, 10, 18, .96);
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: 0 24px 70px rgba(0,0,0,.35);
+    }
+    .review-screen.active { display: block; }
+    .review-hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .review-hero h2 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 34px);
+    }
+    .review-hero p {
+      margin: 8px 0 0;
+      color: rgba(255,255,255,.72);
+      line-height: 1.5;
+    }
+    .review-score {
+      width: 120px;
+      height: 120px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle, rgba(16,185,129,.20), rgba(248,0,32,.12));
+      border: 1px solid rgba(255,255,255,.14);
+      text-align: center;
+      font-weight: 900;
+    }
+    .review-score strong {
+      display: block;
+      font-size: 28px;
+      line-height: 1;
+    }
+    .review-score span {
+      display: block;
+      font-size: 11px;
+      opacity: .75;
+      margin-top: 4px;
+    }
+    .review-stats {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .review-stat {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.055);
+      border: 1px solid rgba(255,255,255,.09);
+    }
+    .review-stat small {
+      display: block;
+      color: rgba(255,255,255,.66);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+    .review-stat strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 22px;
+    }
+    .review-list {
+      display: grid;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .review-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.045);
+    }
+    .review-item.approved { border-color: rgba(16,185,129,.35); background: rgba(16,185,129,.08); }
+    .review-item.warning { border-color: rgba(245,158,11,.48); background: rgba(245,158,11,.10); }
+    .review-item.rejected, .review-item.missing { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); }
+    .review-item.skipped { border-color: rgba(148,163,184,.25); background: rgba(148,163,184,.08); }
+    .review-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,.08);
+      font-size: 18px;
+    }
+    .review-item-title {
+      font-weight: 900;
+      margin-bottom: 3px;
+    }
+    .review-item-detail {
+      color: rgba(255,255,255,.70);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .review-item-file {
+      color: rgba(255,255,255,.52);
+      font-size: 11px;
+      margin-top: 4px;
+    }
+    .review-replace-btn {
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      border-radius: 12px;
+      padding: 9px 12px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .review-replace-btn:hover { background: rgba(255,255,255,.14); }
+    .review-actions {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .review-actions button {
+      border-radius: 14px;
+      padding: 13px 14px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .btn-primary-review {
+      border: none;
+      background: linear-gradient(135deg, #f80020, #ff445c);
+      color: #fff;
+    }
+    .btn-secondary-review {
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.08);
+      color: #fff;
+    }
+    .review-alert {
+      padding: 13px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(245,158,11,.25);
+      background: rgba(245,158,11,.10);
+      color: #fbbf24;
+      font-size: 13px;
+      line-height: 1.45;
+      margin-top: 12px;
+    }
+    .draft-toast {
+      display: none;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(16,185,129,.12);
+      border: 1px solid rgba(16,185,129,.28);
+      color: #6ee7b7;
+      font-weight: 800;
+    }
+    .draft-toast.active { display: block; }
+
+    .archive-result {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(16,185,129,.10);
+      border: 1px solid rgba(16,185,129,.28);
+      color: #d1fae5;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .archive-result a {
+      color: #86efac;
+      font-weight: 900;
+      text-decoration: underline;
+    }
+    
+    .review-loading-overlay {
+      display: none;
+      padding: 24px;
+      border-radius: 24px;
+      margin-top: 18px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.36);
+      text-align: center;
+    }
+    .review-loading-overlay.active { display: block; }
+    .review-loading-spinner {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 12px;
+      border-radius: 999px;
+      border: 4px solid rgba(255,255,255,.18);
+      border-top-color: #f80020;
+      animation: reviewSpin .8s linear infinite;
+    }
+    @keyframes reviewSpin { to { transform: rotate(360deg); } }
+    @media (max-width: 760px) {
+      .resume-actions-row, .resume-inline, .review-hero, .review-stats, .review-actions {
+        grid-template-columns: 1fr;
+      }
+      .review-score {
+        width: 100%;
+        height: auto;
+        padding: 16px;
+        border-radius: 18px;
+      }
+      .review-item {
+        grid-template-columns: auto 1fr;
+      }
+      .review-replace-btn {
+        grid-column: 1 / -1;
+      }
+    }
+  </style>
+
+</head>
+
+<body>
+  <div class="main-wrapper">
+    <div class="left-panel">
+      <div class="left-content">
+        <div class="logo-container">
+          <img src="img/Logo-Rojo.png" alt="Logo SHIP" class="logo" />
+        </div>
+        <h1>Portal de Documentos</h1>
+        <p class="subtitle">Complete su registro y al final revisaremos todos sus documentos con IA.</p>
+        <div class="security-badge">
+          <h3>
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd"
+                d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clip-rule="evenodd" />
+            </svg>
+            Información Protegida
+          </h3>
+          <p>Sus datos se mantienen seguros gracias a un cifrado de estándar bancario.</p>
+        </div>
+        <ul class="info-list">
+          <li>Documentos completamente legibles y actuales</li>
+          <li>Formatos permitidos: PDF, JPG, PNG</li>
+          <li><strong>Límites:</strong> 5&nbsp;MB por archivo, 40&nbsp;MB en total</li>
+          <li>Información consistente en todos los documentos</li>
+          <li>Revisión IA al finalizar con resumen claro de correcciones</li><li>Puede recuperar un avance previo usando CURP</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-step active" data-step="1">
+            <div class="progress-dot">1</div><span>Datos Personales</span>
+          </div>
+          <div class="progress-line"></div>
+          <div class="progress-step" data-step="2">
+            <div class="progress-dot">2</div><span>Documentos</span>
+          </div>
+          <div class="progress-line"></div>
+          <div class="progress-step" data-step="3">
+            <div class="progress-dot">3</div><span>Vehículo</span>
+          </div>
+          <div class="progress-line"></div>
+          <div class="progress-step" data-step="4">
+            <div class="progress-dot">4</div><span>Referencias</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-container">
+
+        <div class="resume-actions-card" id="resume-card">
+          <h3>¿Ya habías iniciado tu registro?</h3>
+          <p>Si ya habías iniciado un registro, puedes recuperar tu avance con tu CURP. El sistema toma la CURP desde el documento que sube el driver.</p>
+          <div class="resume-actions-row">
+            <button type="button" class="btn-outline-soft" id="new-registration-btn">Nuevo registro</button>
+            <button type="button" class="btn-outline-soft" id="show-resume-btn">Continuar registro</button>
+          </div>
+          <div class="resume-box" id="resume-box">
+            <div class="resume-inline">
+              <div>
+                <label for="resume-curp">CURP</label>
+                <input type="text" id="resume-curp" maxlength="18" placeholder="Ingresa tu CURP para buscar avance" />
+              </div>
+              <button type="button" class="btn-outline-soft" id="load-draft-btn">Buscar avance</button>
+            </div>
+            <div class="resume-note" id="resume-note">El avance se guarda localmente en este dispositivo para pruebas de desarrollo.</div>
+          </div>
+        </div>
+
+        <div class="form-header">
+          <h2>Formulario de Registro</h2>
+          <p>Complete todos los campos requeridos para continuar</p>
+        </div>
+
+        <form id="document-form" enctype="multipart/form-data" novalidate autocomplete="off">
+          <!-- Campo oculto para jobId -->
+          <input type="hidden" id="jobId" name="jobId" />
+
+          <!-- 1) DATOS PERSONALES -->
+          <div class="section step active" data-step="1">
+            <h3>
+              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+              Información Personal
+            </h3>
+            <p class="hint">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clip-rule="evenodd" />
+              </svg>
+              Ingrese su nombre legal completo y un número telefónico válido de 10 dígitos
+            </p>
+
+            <div class="grid">
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                        clip-rule="evenodd" />
+                    </svg>
+                    Identificación Personal
+                  </div>
+                  <div class="grid">
+                    <div class="col-12">
+                      <label for="nombre"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                            clip-rule="evenodd" />
+                        </svg>Nombre Completo <span class="required">*</span></label>
+                      <input type="text" id="nombre" name="nombre" required
+                        placeholder="Ingrese su nombre legal completo" autocomplete="name" />
+                    </div>
+
+                    <div class="col-6">
+                      <label for="telefono"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                        </svg>Teléfono <span class="required">*</span></label>
+                      <input type="text" id="telefono" name="telefono" required inputmode="numeric" maxlength="10"
+                        placeholder="10 dígitos" autocomplete="tel" />
+                    </div>
+                    <div class="col-6">
+                      <label for="selfie"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+                            clip-rule="evenodd" />
+                        </svg>Foto Personal <span class="required">*</span></label>
+                      <input type="file" id="selfie" name="selfie" required accept="image/*" capture="user" />
+                      <div class="muted">Foto frontal clara de su rostro</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd"
+                        d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                        clip-rule="evenodd" />
+                    </svg>Ubicación</div>
+                  <label for="direccion">Dirección Completa <span class="required">*</span></label>
+                  <input type="text" id="direccion" name="direccion" required
+                    placeholder="Calle, número, colonia, ciudad, código postal" />
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                      <path d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9z" />
+                    </svg>Información Bancaria</div>
+                  <div class="grid">
+                    <div class="col-6">
+                      <label for="banco"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4z" />
+                        </svg>Banco Emisor <span class="required">*</span></label>
+                      <input list="bancos" type="text" id="banco" name="banco" required
+                        placeholder="Seleccione su banco" />
+                      <datalist id="bancos">
+                        <option value="BBVA"></option>
+                        <option value="Banamex"></option>
+                        <option value="Santander"></option>
+                        <option value="HSBC"></option>
+                        <option value="Banorte"></option>
+                        <option value="Scotiabank"></option>
+                        <option value="Banco Azteca"></option>
+                        <option value="Inbursa"></option>
+                      </datalist>
+                      <div class="muted">Necesario para pagos de nómina</div>
+                    </div>
+                    <div class="col-6">
+                      <label><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M18 8a6 6 0 01-7.743 5.743L10 14l-4.257-.257A6 6 0 1118 8zM10 12a4 4 0 100-8 4 4 0 000 8z"
+                            clip-rule="evenodd" />
+                        </svg>CLABE Interbancaria <span class="required">*</span></label>
+                      <div class="nss-mode" style="margin-bottom:8px;">
+                        <label><input type="radio" name="clabe_mode" value="texto" checked> Digitar CLABE</label>
+                        <label><input type="radio" name="clabe_mode" value="archivo"> Subir Edo. Cuenta</label>
+                      </div>
+                      <div id="clabe_num_wrap">
+                        <input type="text" id="clabe" name="clabe" required inputmode="numeric" maxlength="18"
+                          placeholder="18 dígitos" />
+                        <div class="muted">Clave bancaria estandarizada</div>
+                      </div>
+                      <div id="clabe_file_wrap" style="display:none;">
+                        <input type="file" id="estado_cuenta" name="estado_cuenta" accept=".pdf,.jpg,.jpeg,.png" />
+                        <div class="muted">Documento con nombre y CLABE visible</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="nav-buttons"><button type="button" id="next-1">Continuar →</button></div>
+          </div>
+
+          <!-- 2) DOCUMENTOS PERSONALES -->
+          <div class="section step" data-step="2">
+            <h3>
+              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                </path>
+              </svg>
+              Documentos Oficiales
+            </h3>
+            <p class="hint">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                  clip-rule="evenodd" />
+              </svg>
+              Suba documentos oficiales en PDF/JPG/PNG (máx. 5&nbsp;MB por archivo, 40&nbsp;MB total)
+            </p>
+
+            <div class="grid">
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6z"
+                        clip-rule="evenodd" />
+                    </svg>Documentos de Identidad</div>
+                  <div class="grid">
+                    <div class="col-6">
+                      <label for="ine_frontal"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6z"
+                            clip-rule="evenodd" />
+                        </svg>INE Frontal <span class="required">*</span></label>
+                      <input type="file" id="ine_frontal" name="ine_frontal" required accept=".pdf,.jpg,.jpeg,.png" />
+                    </div>
+                    <div class="col-6">
+                      <label for="ine_reverso"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6z"
+                            clip-rule="evenodd" />
+                        </svg>INE Reverso <span class="required">*</span></label>
+                      <input type="file" id="ine_reverso" name="ine_reverso" required accept=".pdf,.jpg,.jpeg,.png" />
+                    </div>
+                    <div class="col-6">
+                      <label for="curp"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                            clip-rule="evenodd" />
+                        </svg>CURP <span class="required">*</span></label>
+                      <input type="file" id="curp" name="curp" required accept=".pdf,.jpg,.jpeg,.png" />
+                      <a class="help-link" href="https://www.gob.mx/curp/" target="_blank"
+                        rel="noopener noreferrer">Consultar CURP →</a>
+                    </div>
+                    <div class="col-6">
+                      <label for="acta"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                            clip-rule="evenodd" />
+                        </svg>Acta de Nacimiento <span class="required">*</span></label>
+                      <input type="file" id="acta" name="acta" required accept=".pdf,.jpg,.jpeg,.png" />
+                      <a class="help-link" href="https://www.miregistrocivil.gob.mx/" target="_blank"
+                        rel="noopener noreferrer">Consultar Acta →</a>
+                    </div>
+                    <div class="col-6">
+                      <label for="comprobante"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                            clip-rule="evenodd" />
+                        </svg>Comprobante Domicilio <span class="required">*</span></label>
+                      <input type="file" id="comprobante" name="comprobante" required accept=".pdf,.jpg,.jpeg,.png" />
+                      <div class="muted">Recibo de luz, agua o teléfono reciente</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd"
+                        d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 01-2-2h2zm4-3a1 1 0 00-1 1v1h2V4a1 1 0 00-1-1z"
+                        clip-rule="evenodd" />
+                    </svg>Seguridad Social</div>
+                  <label>Número de Seguro Social <span class="required">*</span></label>
+                  <div class="nss-mode">
+                    <label><input type="radio" name="nss_mode" value="archivo" checked> Subir documento NSS</label>
+                    <label><input type="radio" name="nss_mode" value="numero"> Escribir número NSS</label>
+                  </div>
+                  <div class="grid">
+                    <div class="col-6" id="nss_file_wrap">
+                      <label for="nss_file">Archivo NSS</label>
+                      <input type="file" id="nss_file" name="nss_file" accept=".pdf,.jpg,.jpeg,.png" />
+                      <a class="help-link"
+                        href="https://serviciosdigitales.imss.gob.mx/gestionAsegurados-web-externo/asignacionNSS"
+                        target="_blank" rel="noopener noreferrer">Consultar NSS →</a>
+                    </div>
+                    <div class="col-6" id="nss_num_wrap" style="display:none;">
+                      <label for="nss_num">Número NSS (11 dígitos)</label>
+                      <input type="text" id="nss_num" name="nss_num" inputmode="numeric" maxlength="11"
+                        placeholder="12345678901" disabled />
+                      <a class="help-link"
+                        href="https://serviciosdigitales.imss.gob.mx/gestionAsegurados-web-externo/asignacionNSS"
+                        target="_blank" rel="noopener noreferrer">Consultar NSS →</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6z"
+                        clip-rule="evenodd" />
+                    </svg>Situación Fiscal</div>
+                  <!-- Constancia ahora opcional: sin asterisco y sin required -->
+                  <label for="constancia"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                        clip-rule="evenodd" />
+                    </svg>Constancia de Situación Fiscal</label>
+                  <input type="file" id="constancia" name="constancia" accept=".pdf,.jpg,.jpeg,.png" />
+                  <a class="help-link"
+                    href="https://www.sat.gob.mx/portal/public/tramites/constancia-de-situacion-fiscal" target="_blank"
+                    rel="noopener noreferrer">Obtener CSF →</a>
+                </div>
+              </div>
+            </div>
+            <div class="nav-buttons"><button type="button" class="btn-secondary" id="back-2">← Anterior</button><button
+                type="button" id="next-2">Continuar →</button></div>
+          </div>
+
+          <!-- 3) DOCUMENTOS VEHICULARES -->
+          <div class="section step" data-step="3">
+            <h3>
+              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a2 2 0 01-2 2z">
+                </path>
+              </svg>
+              Documentación Vehicular
+            </h3>
+            <p class="hint"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path
+                  d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a2 2 0 01-2 2z" />
+              </svg>Documentos vigentes del vehículo que utilizará para trabajar</p>
+
+            <div class="grid">
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                      <path
+                        d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a2 2 0 01-2 2z" />
+                    </svg>Documentos del Vehículo</div>
+                  <div class="grid">
+                    <div class="col-6">
+                      <label for="licencia"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6z"
+                            clip-rule="evenodd" />
+                        </svg>Licencia de Conducir <span class="required">*</span></label>
+                      <input type="file" id="licencia" name="licencia" required accept=".pdf,.jpg,.jpeg,.png" />
+                      <div class="muted">Licencia vigente tipo A, B o C</div>
+                    </div>
+                    <div class="col-6">
+                      <label for="tarjeta"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                            clip-rule="evenodd" />
+                        </svg>Tarjeta de Circulación <span class="required">*</span></label>
+                      <input type="file" id="tarjeta" name="tarjeta" required accept=".pdf,.jpg,.jpeg,.png" />
+                      <div class="muted">La tarjeta es opcional. Si la subes, se validará con IA.</div>
+                      <div class="muted">Documento oficial del vehículo</div>
+                    </div>
+                    <div class="col-12">
+                      <!-- PÓLIZA AHORA OPCIONAL: sin asterisco y sin required -->
+                      <label for="poliza"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd"
+                            d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001z"
+                            clip-rule="evenodd" />
+                        </svg>Póliza de Seguro Vehicular</label>
+                      <input type="file" id="poliza" name="poliza" accept=".pdf,.jpg,.jpeg,.png" />
+                      <div class="muted">La póliza es opcional. Si la subes, se validará con IA.</div>
+                      <div class="muted">Seguro vigente con cobertura amplia</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="nav-buttons"><button type="button" class="btn-secondary" id="back-3">← Anterior</button><button
+                type="button" id="next-3">Continuar →</button></div>
+          </div>
+
+          <!-- 4) REFERENCIAS -->
+          <div class="section step" data-step="4">
+            <h3>
+              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z">
+                </path>
+              </svg>
+              Referencias Personales
+            </h3>
+            <p class="hint"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.660.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+              </svg>Proporcione dos contactos de referencia que puedan confirmar su información</p>
+
+            <div class="grid">
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>Primera Referencia</div>
+                  <div class="grid">
+                    <div class="col-6">
+                      <label for="ref1_nombre"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                            clip-rule="evenodd" />
+                        </svg>Nombre Completo <span class="required">*</span></label>
+                      <input type="text" id="ref1_nombre" name="ref1_nombre" required
+                        placeholder="Nombre completo del contacto" />
+                    </div>
+                    <div class="col-6">
+                      <label for="ref1_tel"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                        </svg>Teléfono <span class="required">*</span></label>
+                      <input type="text" id="ref1_tel" name="ref1_tel" required inputmode="numeric" maxlength="10"
+                        placeholder="Número telefónico" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="field-group">
+                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>Segunda Referencia</div>
+                  <div class="grid">
+                    <div class="col-6">
+                      <label for="ref2_nombre"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                            clip-rule="evenodd" />
+                        </svg>Nombre Completo <span class="required">*</span></label>
+                      <input type="text" id="ref2_nombre" name="ref2_nombre" required
+                        placeholder="Nombre completo del contacto" />
+                    </div>
+                    <div class="col-6">
+                      <label for="ref2_tel"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 0 0 6.105 6.105l.774-1.548a1 1 0 0 1 1.059-.54l4.435.74a1 1 0 0 1 .836.986V17a1 1 0 0 1-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                        </svg>Teléfono <span class="required">*</span></label>
+                      <input type="text" id="ref2_tel" name="ref2_tel" required inputmode="numeric" maxlength="10"
+                        placeholder="Número telefónico" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="nav-buttons">
+              <button type="button" class="btn-secondary" id="back-4">← Anterior</button>
+              <button id="submitBtn" type="submit"><span id="btn-text">Revisar documentos con IA</span><span id="btn-spinner"
+                  class="loading" style="display:none;"></span></button>
+            </div>
+
+  
+          <div class="review-loading-overlay" id="review-loading">
+            <div class="review-loading-spinner"></div>
+            <h3>Validando documentos con IA…</h3>
+            <p>Estamos revisando legibilidad, tipo de documento y coincidencia con el nombre capturado.</p>
+          </div>
+
+          <div class="review-screen" id="ai-review-screen" aria-live="polite">
+            <div class="review-hero">
+              <div>
+                <h2 id="review-title">Resumen de revisión IA</h2>
+                <p id="review-subtitle">Aquí verás los documentos aprobados y los documentos que debes corregir.</p>
+              </div>
+              <div class="review-score">
+                <div>
+                  <strong id="review-score-number">0/0</strong>
+                  <span>Aprobados</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="review-stats">
+              <div class="review-stat"><small>Aprobados</small><strong id="stat-approved">0</strong></div>
+              <div class="review-stat"><small>Observación</small><strong id="stat-warning">0</strong></div>
+              <div class="review-stat"><small>Por corregir</small><strong id="stat-rejected">0</strong></div>
+              <div class="review-stat"><small>Faltantes</small><strong id="stat-missing">0</strong></div>
+              <div class="review-stat"><small>Omitidos</small><strong id="stat-skipped">0</strong></div>
+            </div>
+
+            <div id="review-alert" class="review-alert" style="display:none;"></div>
+            <div class="review-list" id="review-list"></div>
+
+            <div class="review-actions">
+              <button type="button" class="btn-primary-review" id="review-revalidate-btn">Validar nuevamente</button>
+              <button type="button" class="btn-secondary-review" id="save-draft-btn">Guardar avance</button>
+              <button type="button" class="btn-secondary-review" id="review-finish-btn">Guardar registro y generar credencial</button>
+            </div>
+            <div class="draft-toast" id="draft-toast"></div>
+            <div class="archive-result" id="archive-result" style="display:none;"></div>
+          </div>
+
+
+          <div id="err" role="alert"></div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const errEl = document.getElementById("err");
+    const submitBtn = document.getElementById("submitBtn");
+    const btnText = document.getElementById("btn-text");
+    const btnSpinner = document.getElementById("btn-spinner");
+
+    // Generar jobId en el cliente para tracking de uploads por pasos
+    function genJobId() {
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+      return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+    }
+    const globalJobId = genJobId();
+    document.getElementById('jobId') && (document.getElementById('jobId').value = globalJobId);
+
+    const activeUploads = [];
+    const realtimeValidation = new Map();
+
+    const runtimeConfig = {
+      aiReviewOnlyMode: true,
+      localDevMode: false,
+      documentAiValidationEnabled: true,
+      documentAiValidationRequired: true
+    };
+
+    const runtimeConfigPromise = fetch("/api/config", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : {})
+      .then(cfg => Object.assign(runtimeConfig, cfg || {}))
+      .catch(() => runtimeConfig);
+
+
+
+    const DRAFT_PREFIX = "ship_registration_draft_curp_";
+    let latestReviewPayload = null;
+    let loadedDraftCurp = "";
+
+    const DOC_LABELS = {
+      selfie: "Foto personal / selfie",
+      estado_cuenta: "Estado de cuenta bancario",
+      ine_frontal: "INE frontal",
+      ine_reverso: "INE reverso",
+      curp: "CURP",
+      nss_file: "Documento NSS",
+      constancia: "Constancia de situación fiscal",
+      acta: "Acta de nacimiento",
+      comprobante: "Comprobante de domicilio",
+      licencia: "Licencia de conducir",
+      tarjeta: "Tarjeta de circulación",
+      poliza: "Póliza de seguro"
+    };
+
+    function normalizeNameForValidation(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^A-ZÑ\s]/gi, " ")
+        .toUpperCase()
+        .replace(/\b(DE|DEL|LA|LAS|LOS|Y|DA|DAS|DOS)\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function normalizeCurp(v) {
+      return String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 18);
+    }
+
+    function setBusyReview(isBusy) {
+      const loading = document.getElementById("review-loading");
+      if (loading) loading.classList.toggle("active", Boolean(isBusy));
+      submitBtn.disabled = Boolean(isBusy);
+      btnText.textContent = isBusy ? "Validando con IA..." : "Revisar documentos con IA";
+      btnSpinner.style.display = isBusy ? "inline-block" : "none";
+    }
+
+    function collectTextData() {
+      const data = {};
+      document.querySelectorAll("#document-form input, #document-form select, #document-form textarea").forEach((el) => {
+        if (!el.name || el.type === "file") return;
+        if ((el.type === "radio" || el.type === "checkbox") && !el.checked) return;
+        data[el.name] = el.value || "";
+      });
+      return data;
+    }
+
+    function fillTextData(data = {}) {
+      Object.entries(data).forEach(([name, value]) => {
+        const elements = Array.from(document.querySelectorAll(`[name="${CSS.escape(name)}"]`));
+        elements.forEach((el) => {
+          if (el.type === "radio" || el.type === "checkbox") {
+            el.checked = String(el.value) === String(value);
+          } else if (el.type !== "file") {
+            el.value = value || "";
+          }
+        });
+      });
+      if (document.querySelector('input[name="clabe_mode"]:checked')) {
+        applyClabeMode(document.querySelector('input[name="clabe_mode"]:checked').value);
+      }
+      if (document.querySelector('input[name="nss_mode"]:checked')) {
+        applyNssMode(document.querySelector('input[name="nss_mode"]:checked').value);
+      }
+    }
+
+    function buildFinalReviewFormData() {
+      const fd = new FormData(document.getElementById("document-form"));
+      fd.set("jobId", globalJobId);
+      const nombreNormalizado = normalizeNameForValidation(document.getElementById("nombre").value || "");
+      fd.set("nombre", nombreNormalizado);
+      fd.set("telefono", document.getElementById("telefono").value || "");
+
+      if (loadedDraftCurp) {
+        fd.set("draftCurp", loadedDraftCurp);
+        fd.set("useDraftFiles", "1");
+      }
+
+      return fd;
+    }
+
+    function statusForRow(row) {
+      if (row.status === "skipped") return "skipped";
+      if (row.status === "warning" || row.severity === "warning") return "warning";
+      if (row.status === "approved" || row.ok === true) return "approved";
+      if (row.status === "missing") return "missing";
+      return "rejected";
+    }
+
+    function iconForStatus(status) {
+      if (status === "approved") return "✅";
+      if (status === "warning") return "🟡";
+      if (status === "missing") return "📎";
+      if (status === "skipped") return "➖";
+      return "🔴";
+    }
+
+    function detailForRow(row) {
+      const warnings = row?.warnings || [];
+      if (row?.status === "warning" || row?.severity === "warning") {
+        if (warnings.length) return warnings.slice(0, 3).join(" ");
+        return row?.summary || "Documento válido con observación.";
+      }
+
+      const issues = row?.issues || [];
+      if (row?.status === "rejected" || row?.ok === false) {
+        if (issues.length) return issues.slice(0, 3).join(" ");
+        return row?.summary || "Documento no aprobado.";
+      }
+
+      return row?.summary || "Documento aprobado.";
+    }
+
+    function renderReviewSummary(payload) {
+      latestReviewPayload = payload;
+
+      const screen = document.getElementById("ai-review-screen");
+      const list = document.getElementById("review-list");
+      const alert = document.getElementById("review-alert");
+      const summary = payload.summary || {};
+      const rows = payload.results || [];
+
+      document.getElementById("review-score-number").textContent = `${summary.approved || 0}/${Math.max((summary.total || rows.length) - (summary.skipped || 0), 0)}`;
+      document.getElementById("stat-approved").textContent = summary.approved || 0;
+      document.getElementById("stat-warning").textContent = summary.warnings || 0;
+      document.getElementById("stat-rejected").textContent = summary.rejected || 0;
+      document.getElementById("stat-missing").textContent = summary.missing || 0;
+      document.getElementById("stat-skipped").textContent = summary.skipped || 0;
+
+      const title = document.getElementById("review-title");
+      const subtitle = document.getElementById("review-subtitle");
+
+      if (summary.canContinue) {
+        title.textContent = summary.warnings ? "Documentos válidos con observaciones" : "Documentos aprobados";
+        subtitle.textContent = summary.warnings
+          ? "Puedes guardar el registro. Los documentos marcados en amarillo son válidos, pero no están a nombre del driver o requieren observación operativa."
+          : "La IA no detectó errores bloqueantes. Puedes finalizar la revisión o guardar tu avance.";
+        if (summary.warnings) {
+          alert.style.display = "";
+          alert.textContent = "Amarillo = documento válido con observación. Verde = válido y a nombre del driver. Rojo = inválido o no corresponde.";
+        } else {
+          alert.style.display = "none";
+        }
+      } else {
+        title.textContent = "Hay documentos por corregir";
+        subtitle.textContent = "Sube nuevamente los documentos marcados y vuelve a validar. También puedes guardar tu avance; para continuar después deberás ingresar tu CURP.";
+        alert.style.display = "";
+        alert.textContent = "Puedes guardar el avance sin capturar CURP manualmente: el sistema la tomará del documento CURP detectado por IA y guardará rutas locales de los archivos para reutilizarlos al continuar.";
+      }
+
+      list.innerHTML = rows.map((row) => {
+        const status = statusForRow(row);
+        const label = row.label || DOC_LABELS[row.fieldName] || row.fieldName;
+        const canReplace = status === "rejected" || status === "missing" || status === "warning";
+        const fileName = row.fileName ? `<div class="review-item-file">Archivo revisado: ${row.fileName}</div>` : "";
+        const model = row.modelUsed ? `<div class="review-item-file">Modelo IA: ${row.modelUsed}</div>` : "";
+        const owner = row.ownerCheckApplies
+          ? `<div class="review-item-file">Titular/propietario: ${row.nameFound || "No detectado"} · ${row.ownerMatchesDriver ? "Coincide con driver" : "Observación"}</div>`
+          : "";
+
+        return `
+          <div class="review-item ${status}" data-field="${row.fieldName}">
+            <div class="review-icon">${iconForStatus(status)}</div>
+            <div>
+              <div class="review-item-title">${label}</div>
+              <div class="review-item-detail">${detailForRow(row)}</div>
+              ${fileName}
+              ${owner}
+              ${model}
+            </div>
+            ${canReplace ? `<button type="button" class="review-replace-btn" data-field="${row.fieldName}">${status === "warning" ? "Cambiar archivo" : "Reemplazar archivo"}</button>` : ""}
+          </div>
+        `;
+      }).join("");
+
+      document.getElementById("review-finish-btn").disabled = !summary.canContinue;
+      document.getElementById("review-finish-btn").textContent = summary.canContinue ? "Guardar registro y generar credencial" : "Corrige documentos primero";
+
+      screen.classList.add("active");
+      screen.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    async function runFinalAiReview() {
+      await runtimeConfigPromise;
+
+      setBusyReview(true);
+      errEl.style.display = "none";
+      errEl.textContent = "";
+
+      try {
+        const resp = await fetch("/api/registration/final-review", {
+          method: "POST",
+          body: buildFinalReviewFormData(),
+          cache: "no-store"
+        });
+
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || `Error en revisión IA (HTTP ${resp.status})`);
+        }
+
+        renderReviewSummary(data);
+      } catch (err) {
+        errEl.textContent = err.message || "No fue posible ejecutar la revisión IA.";
+        errEl.style.display = "block";
+      } finally {
+        setBusyReview(false);
+      }
+    }
+
+
+    function validateReadyForLocalSave() {
+      if (!latestReviewPayload?.summary?.canContinue) {
+        errEl.textContent = "Primero corrige documentos faltantes o rechazados y vuelve a validar con IA.";
+        errEl.style.display = "block";
+        return false;
+      }
+
+      const requiredFiles = Array.from(document.querySelectorAll('input[type="file"]'))
+        .filter((input) => !input.disabled && input.required);
+
+      for (const input of requiredFiles) {
+        if (!(input.files || [])[0]) {
+          markInvalid(input, "Para guardar el registro, vuelve a subir este archivo.");
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    async function saveRegistrationAndGenerateCredential() {
+      if (!validateReadyForLocalSave()) return;
+
+      const btn = document.getElementById("review-finish-btn");
+      const resultBox = document.getElementById("archive-result");
+      const previousText = btn.textContent;
+
+      btn.disabled = true;
+      btn.textContent = "Guardando Excel y generando credencial…";
+      resultBox.style.display = "none";
+      resultBox.innerHTML = "";
+
+      try {
+        const resp = await fetch("/api/registration/save-local", {
+          method: "POST",
+          body: buildFinalReviewFormData(),
+          cache: "no-store"
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || `Error guardando registro (HTTP ${resp.status})`);
+        }
+
+        resultBox.style.display = "";
+        resultBox.innerHTML = `
+          <strong>Registro guardado correctamente.</strong><br>
+          Excel: <a href="${data.excel?.url || '#'}" target="_blank" rel="noopener">Abrir archivo Excel</a><br>
+          Credencial: <a href="${data.credentialPdf?.url || '#'}" target="_blank" rel="noopener">Abrir credencial PDF</a><br>
+          Fila agregada: ${data.excel?.rowNumber || "N/A"}<br>
+          ID credencial: ${data.credentialId || "N/A"}
+        `;
+
+        const toast = document.getElementById("draft-toast");
+        toast.textContent = "Registro guardado en Excel local y credencial generada.";
+        toast.classList.add("active");
+
+        btn.textContent = "Registro guardado";
+      } catch (err) {
+        errEl.textContent = err.message || "No fue posible guardar el registro.";
+        errEl.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = previousText;
+      }
+    }
+
+
+
+    function normalizeDetectedCurp(value) {
+      return String(value || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 18);
+    }
+
+    function findCurpInText(value) {
+      const text = String(value || "").toUpperCase();
+      const match = text.match(/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/);
+      return match ? normalizeDetectedCurp(match[0]) : "";
+    }
+
+    function getCurpFromLatestReview() {
+      const rows = latestReviewPayload?.results || [];
+      const curpRow = rows.find((row) => row.fieldName === "curp");
+
+      const candidates = [
+        curpRow?.fields?.curp,
+        curpRow?.curp,
+        curpRow?.summary,
+        ...(curpRow?.issues || []),
+        ...(curpRow?.warnings || [])
+      ];
+
+      for (const candidate of candidates) {
+        const direct = normalizeDetectedCurp(candidate);
+        if (direct.length === 18) return direct;
+
+        const fromText = findCurpInText(candidate);
+        if (fromText.length === 18) return fromText;
+      }
+
+      return "";
+    }
+
+
+    function draftKey(curp) {
+      return DRAFT_PREFIX + normalizeCurp(curp);
+    }
+
+    async function saveDraftForLater() {
+      const curp = getCurpFromLatestReview();
+
+      if (!curp || curp.length < 18) {
+        errEl.textContent = "No fue posible guardar el avance porque la IA no detectó una CURP válida en el documento CURP. Sube un documento CURP legible y vuelve a validar.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      const toast = document.getElementById("draft-toast");
+      toast.textContent = "Guardando avance y rutas locales de archivos…";
+      toast.classList.add("active");
+
+      try {
+        const resp = await fetch("/api/registration/save-draft-local", {
+          method: "POST",
+          body: buildFinalReviewFormData(),
+          cache: "no-store"
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || `No fue posible guardar el avance (HTTP ${resp.status}).`);
+        }
+
+        loadedDraftCurp = data.curp || curp;
+
+        const fileCount = Object.keys(data.filePaths || {}).length;
+        toast.textContent = `Avance guardado con ${fileCount} archivo(s). Para continuar después, deberás ingresar tu CURP: ${loadedDraftCurp}.`;
+        setTimeout(() => toast.classList.remove("active"), 8000);
+      } catch (err) {
+        errEl.textContent = err.message || "No fue posible guardar el avance.";
+        errEl.style.display = "block";
+      }
+    }
+
+
+    async function loadDraftByCurp(curpRaw) {
+      const curp = normalizeCurp(curpRaw);
+      const note = document.getElementById("resume-note");
+
+      if (!curp || curp.length < 18) {
+        note.textContent = "Ingresa una CURP válida de 18 caracteres.";
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/api/registration/draft-local/${encodeURIComponent(curp)}`, {
+          method: "GET",
+          cache: "no-store"
+        });
+
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || !data.ok) {
+          // Compatibilidad con avances antiguos en localStorage.
+          const raw = localStorage.getItem(draftKey(curp));
+          if (!raw) {
+            note.textContent = data.error || "No encontramos un avance local para esa CURP.";
+            return;
+          }
+
+          const draft = JSON.parse(raw);
+          fillTextData(draft.data || {});
+          latestReviewPayload = draft.latestReviewPayload || null;
+          loadedDraftCurp = curp;
+
+          if (latestReviewPayload) renderReviewSummary(latestReviewPayload);
+
+          note.textContent = `Avance cargado desde navegador. Si los archivos no aparecen, vuelve a subirlos.`;
+          showStep(1);
+          return;
+        }
+
+        const draft = data.draft || {};
+        fillTextData(draft.data || {});
+        latestReviewPayload = draft.latestReviewPayload || null;
+        loadedDraftCurp = draft.curp || curp;
+
+        const fileNames = Object.values(draft.filePaths || {})
+          .map((x) => x.originalName || x.relativePath)
+          .filter(Boolean);
+
+        if (latestReviewPayload) renderReviewSummary(latestReviewPayload);
+
+        note.textContent = fileNames.length
+          ? `Avance cargado. Se encontraron ${fileNames.length} archivo(s) guardados localmente; se reutilizarán si no subes archivos nuevos.`
+          : "Avance cargado. No se encontraron archivos guardados; vuelve a subir documentos faltantes.";
+
+        showStep(1);
+      } catch (e) {
+        note.textContent = "No fue posible cargar el avance local.";
+      }
+    }
+
+
+
+    function digits(value) {
+      return String(value || "").replace(/\D+/g, "");
+    }
+
+    function normalizePhone(value) {
+      const d = digits(value);
+      return d.length < 10 ? null : d.slice(0, 10);
+    }
+
+    function normalizeClabe(value) {
+      const d = digits(value);
+      if (!d) return "";
+      return d.length < 18 ? null : d.slice(0, 18);
+    }
+
+    function normalizeNss(value) {
+      const d = digits(value);
+      if (!d) return "";
+      return d.length < 11 ? null : d.slice(0, 11);
+    }
+
+    function onlyDigitsInput(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("input", () => {
+        el.value = el.value.replace(/\D+/g, "");
+      });
+    }
+
+    function markInvalid(el, msg) {
+      if (!el) {
+        errEl.textContent = msg || "Revisa la información capturada.";
+        errEl.style.display = "block";
+        return false;
+      }
+      el.classList.add("invalid");
+      errEl.textContent = msg || "Revisa este campo.";
+      errEl.style.display = "block";
+      try {
+        el.focus({ preventScroll: true });
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (_) {}
+      return false;
+    }
+
+    function clearInvalid(el) {
+      if (el) el.classList.remove("invalid");
+    }
+
+    function shortFileName(name) {
+      if (!name) return "";
+      return name.length > 38 ? name.slice(0, 35) + "…" : name;
+    }
+
+    function getFileStatusEl(input) {
+      let statusEl = input.nextElementSibling;
+      if (!statusEl || !statusEl.classList.contains("file-status")) {
+        statusEl = document.createElement("div");
+        statusEl.className = "file-status";
+        input.insertAdjacentElement("afterend", statusEl);
+      }
+      return statusEl;
+    }
+
+    function setFileStatus(input, type, title, detail = "") {
+      const statusEl = getFileStatusEl(input);
+      statusEl.className = `file-status is-${type}`;
+      statusEl.innerHTML = `
+        <span class="status-icon">📄</span>
+        <span>
+          ${title}
+          ${detail ? `<small>${detail}</small>` : ""}
+        </span>
+      `;
+    }
+
+    function updateProgress(step) {
+      document.querySelectorAll(".progress-step").forEach((stepEl, index) => {
+        const stepNum = index + 1;
+        stepEl.classList.remove("active", "completed");
+        const dot = stepEl.querySelector(".progress-dot");
+
+        if (stepNum < step) {
+          stepEl.classList.add("completed");
+          if (dot) dot.innerHTML = "✓";
+        } else if (stepNum === step) {
+          stepEl.classList.add("active");
+          if (dot) dot.innerHTML = String(stepNum);
+        } else if (dot) {
+          dot.innerHTML = String(stepNum);
+        }
+      });
+    }
+
+    function showStep(n) {
+      document.querySelectorAll(".step").forEach((s) => {
+        s.classList.toggle("active", Number(s.dataset.step) === Number(n));
+      });
+      errEl.textContent = "";
+      errEl.style.display = "none";
+      document.querySelectorAll(".invalid").forEach((el) => el.classList.remove("invalid"));
+      updateProgress(Number(n));
+
+      try {
+        document.querySelector(".right-panel")?.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (_) {}
+    }
+
+    function applyClabeMode(mode) {
+      const clabeFileWrap = document.getElementById("clabe_file_wrap");
+      const clabeNumWrap = document.getElementById("clabe_num_wrap");
+      const clabeFile = document.getElementById("estado_cuenta");
+      const clabeNum = document.getElementById("clabe");
+
+      if (!clabeFileWrap || !clabeNumWrap || !clabeFile || !clabeNum) return;
+
+      if (mode === "archivo") {
+        clabeFileWrap.style.display = "";
+        clabeFile.disabled = false;
+        clabeFile.required = true;
+
+        clabeNumWrap.style.display = "none";
+        clabeNum.disabled = true;
+        clabeNum.required = false;
+        clabeNum.value = "";
+        clearInvalid(clabeNum);
+      } else {
+        clabeNumWrap.style.display = "";
+        clabeNum.disabled = false;
+        clabeNum.required = true;
+
+        clabeFileWrap.style.display = "none";
+        clabeFile.disabled = true;
+        clabeFile.required = false;
+        clabeFile.value = "";
+        clearInvalid(clabeFile);
+      }
+    }
+
+    function applyNssMode(mode) {
+      const nssFileWrap = document.getElementById("nss_file_wrap");
+      const nssNumWrap = document.getElementById("nss_num_wrap");
+      const nssFile = document.getElementById("nss_file");
+      const nssNum = document.getElementById("nss_num");
+
+      if (!nssFileWrap || !nssNumWrap || !nssFile || !nssNum) return;
+
+      if (mode === "numero") {
+        nssNumWrap.style.display = "";
+        nssNum.disabled = false;
+        nssNum.required = true;
+
+        nssFileWrap.style.display = "none";
+        nssFile.disabled = true;
+        nssFile.required = false;
+        nssFile.value = "";
+        clearInvalid(nssFile);
+      } else {
+        nssFileWrap.style.display = "";
+        nssFile.disabled = false;
+        nssFile.required = true;
+
+        nssNumWrap.style.display = "none";
+        nssNum.disabled = true;
+        nssNum.required = false;
+        nssNum.value = "";
+        clearInvalid(nssNum);
+      }
+    }
+
+    function validateFileSizes() {
+      const maxFile = 5 * 1024 * 1024;
+      const maxTotal = 40 * 1024 * 1024;
+      let total = 0;
+
+      for (const input of document.querySelectorAll('input[type="file"]')) {
+        const file = (input.files || [])[0];
+        if (!file) continue;
+
+        total += file.size || 0;
+        if ((file.size || 0) > maxFile) {
+          return markInvalid(input, `El archivo ${file.name} excede 5 MB.`);
+        }
+      }
+
+      if (total > maxTotal) {
+        errEl.textContent = "El total de archivos supera 40 MB.";
+        errEl.style.display = "block";
+        return false;
+      }
+
+      return true;
+    }
+
+    function hardResetForm() {
+      const form = document.getElementById("document-form");
+      if (!form) return;
+
+      form.reset();
+      document.querySelectorAll(".file-status").forEach((el) => el.remove());
+      document.getElementById("ai-review-screen")?.classList.remove("active");
+      document.getElementById("review-loading")?.classList.remove("active");
+      document.getElementById("archive-result") && (document.getElementById("archive-result").style.display = "none");
+      latestReviewPayload = null;
+      loadedDraftCurp = "";
+
+      applyClabeMode("texto");
+      applyNssMode("archivo");
+      showStep(1);
+    }
+
+    function validateStep1() {
+      const nombreEl = document.getElementById("nombre");
+      const telEl = document.getElementById("telefono");
+      const dirEl = document.getElementById("direccion");
+      const bancoEl = document.getElementById("banco");
+      const clabeMode = document.querySelector('input[name="clabe_mode"]:checked')?.value || "texto";
+      const clabeEl = document.getElementById("clabe");
+      const edoEl = document.getElementById("estado_cuenta");
+      const selfieEl = document.getElementById("selfie");
+
+      if (!nombreEl?.value.trim()) return markInvalid(nombreEl, "Ingrese su nombre completo.");
+      if (!normalizePhone(telEl?.value)) return markInvalid(telEl, "Ingrese teléfono a 10 dígitos.");
+      telEl.value = normalizePhone(telEl.value);
+      if (!selfieEl?.files?.length) return markInvalid(selfieEl, "Debe cargar su foto personal.");
+      if (!dirEl?.value.trim()) return markInvalid(dirEl, "Ingrese dirección completa.");
+      if (!bancoEl?.value.trim()) return markInvalid(bancoEl, "Ingrese banco emisor.");
+
+      if (clabeMode === "archivo") {
+        if (!edoEl?.files?.length && !loadedDraftCurp) {
+          return markInvalid(edoEl, "Debe cargar el estado de cuenta o seleccionar digitar CLABE.");
+        }
+      } else {
+        const clabe = normalizeClabe(clabeEl?.value);
+        if (!clabe) return markInvalid(clabeEl, "Ingrese CLABE de 18 dígitos o seleccione subir estado de cuenta.");
+        clabeEl.value = clabe;
+      }
+
+      return true;
+    }
+
+    function validateStep2() {
+      const requiredIds = ["ine_frontal", "ine_reverso", "curp", "acta", "comprobante", "constancia"];
+      for (const id of requiredIds) {
+        const el = document.getElementById(id);
+        if (el && !el.disabled && !el.files?.length && !loadedDraftCurp) {
+          return markInvalid(el, `Debe cargar ${DOC_LABELS[id] || id}.`);
+        }
+      }
+
+      const nssMode = document.querySelector('input[name="nss_mode"]:checked')?.value || "archivo";
+      if (nssMode === "archivo") {
+        const nssFile = document.getElementById("nss_file");
+        if (!nssFile?.files?.length && !loadedDraftCurp) return markInvalid(nssFile, "Debe cargar documento NSS.");
+      } else {
+        const nssNum = document.getElementById("nss_num");
+        const nss = normalizeNss(nssNum?.value);
+        if (!nss) return markInvalid(nssNum, "Ingrese NSS de 11 dígitos.");
+        nssNum.value = nss;
+      }
+
+      return true;
+    }
+
+    function validateStep3() {
+      const licencia = document.getElementById("licencia");
+
+      if (!licencia?.files?.length && !loadedDraftCurp) return markInvalid(licencia, "Debe cargar licencia de conducir.");
+
+      // Tarjeta de circulación y póliza son opcionales.
+      // Si se cargan, se validan con IA; si no se cargan, no bloquean el registro.
+      return true;
+    }
+
+    function validateStep4() {
+      const ref1NomEl = document.getElementById("ref1_nombre");
+      const ref2NomEl = document.getElementById("ref2_nombre");
+      const ref1TelEl = document.getElementById("ref1_tel");
+      const ref2TelEl = document.getElementById("ref2_tel");
+
+      if (!ref1NomEl?.value.trim()) return markInvalid(ref1NomEl, "Falta primera referencia.");
+      if (!ref2NomEl?.value.trim()) return markInvalid(ref2NomEl, "Falta segunda referencia.");
+
+      const r1 = normalizePhone(ref1TelEl?.value);
+      if (!r1) return markInvalid(ref1TelEl, "Primera referencia: teléfono a 10 dígitos.");
+
+      const r2 = normalizePhone(ref2TelEl?.value);
+      if (!r2) return markInvalid(ref2TelEl, "Segunda referencia: teléfono a 10 dígitos.");
+
+      ref1TelEl.value = r1;
+      ref2TelEl.value = r2;
+      return true;
+    }
+
+    // Inicialización robusta de toggles y navegación.
+    document.querySelectorAll('input[name="clabe_mode"]').forEach((radio) => {
+      radio.addEventListener("change", () => applyClabeMode(radio.value));
+    });
+
+    document.querySelectorAll('input[name="nss_mode"]').forEach((radio) => {
+      radio.addEventListener("change", () => applyNssMode(radio.value));
+    });
+
+    onlyDigitsInput("telefono");
+    onlyDigitsInput("clabe");
+    onlyDigitsInput("nss_num");
+    onlyDigitsInput("ref1_tel");
+    onlyDigitsInput("ref2_tel");
+
+    document.getElementById("nombre")?.addEventListener("input", (e) => {
+      e.target.value = normalizeNameForValidation(e.target.value);
+    });
+
+    document.getElementById("next-1")?.addEventListener("click", () => {
+      if (!validateStep1()) return;
+      showStep(2);
+    });
+
+    document.getElementById("next-2")?.addEventListener("click", () => {
+      if (!validateStep2()) return;
+      showStep(3);
+    });
+
+    document.getElementById("next-3")?.addEventListener("click", () => {
+      if (!validateStep3()) return;
+      showStep(4);
+    });
+
+    document.getElementById("back-2")?.addEventListener("click", () => showStep(1));
+    document.getElementById("back-3")?.addEventListener("click", () => showStep(2));
+    document.getElementById("back-4")?.addEventListener("click", () => showStep(3));
+
+    document.getElementById("document-form")?.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      errEl.style.display = "none";
+      errEl.textContent = "";
+
+      if (!validateFileSizes()) return;
+      if (!validateStep4()) return;
+
+      await runFinalAiReview();
+    });
+
+    applyClabeMode(document.querySelector('input[name="clabe_mode"]:checked')?.value || "texto");
+    applyNssMode(document.querySelector('input[name="nss_mode"]:checked')?.value || "archivo");
+
+
+    document.querySelectorAll('input[type="file"]').forEach(input => {
+      input.addEventListener("change", function () {
+        const f = (this.files || [])[0];
+        if (!f) return;
+        setFileStatus(this, "selected", `Archivo seleccionado: ${shortFileName(f.name)}`, "Lo revisaremos con IA al finalizar el registro.");
+      });
+    });
+document.getElementById("resume-curp")?.addEventListener("input", (e) => {
+      e.target.value = normalizeCurp(e.target.value);
+    });
+
+    document.getElementById("show-resume-btn")?.addEventListener("click", () => {
+      document.getElementById("resume-box")?.classList.toggle("active");
+      document.getElementById("resume-curp")?.focus();
+    });
+
+    document.getElementById("new-registration-btn")?.addEventListener("click", () => {
+      hardResetForm();
+      latestReviewPayload = null;
+      loadedDraftCurp = "";
+      document.getElementById("ai-review-screen")?.classList.remove("active");
+      document.getElementById("resume-note").textContent = "Nuevo registro iniciado.";
+    });
+
+    document.getElementById("load-draft-btn")?.addEventListener("click", async () => {
+      await loadDraftByCurp(document.getElementById("resume-curp")?.value || "");
+    });
+
+    document.getElementById("save-draft-btn")?.addEventListener("click", saveDraftForLater);
+
+    document.getElementById("review-revalidate-btn")?.addEventListener("click", async () => {
+      await runFinalAiReview();
+    });
+
+    document.getElementById("review-finish-btn")?.addEventListener("click", saveRegistrationAndGenerateCredential);
+
+    document.getElementById("review-list")?.addEventListener("click", (e) => {
+      const btn = e.target.closest(".review-replace-btn");
+      if (!btn) return;
+      const field = btn.dataset.field;
+      const input = document.querySelector(`input[type="file"][name="${CSS.escape(field)}"]`);
+      if (!input) return;
+
+      const step = input.closest(".step")?.dataset?.step;
+      if (step) showStep(Number(step));
+
+      setTimeout(() => {
+        input.scrollIntoView({ behavior: "smooth", block: "center" });
+        input.click();
+      }, 250);
+    });
+
+    updateProgress(1);
+  </script>
+
+  <script>
+    // Google Places Autocomplete
+    async function loadMaps() {
+      try {
+        const res = await fetch("/api/config");
+        const { mapsKey } = await res.json();
+        if (!mapsKey) return;
+        
+        const script = document.createElement("script");
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=places&loading=async&callback=__gmapsReady`;
+        script.async = true;
+        script.defer = true;
+        document.body.appendChild(script);
+      } catch (e) {
+        console.error("Error al cargar la API de Google Maps", e);
+      }
+    }
+
+    function __gmapsReady() {
+      const direccionInput = document.getElementById("direccion");
+      if (!direccionInput) return;
+      
+      if (google.maps && google.maps.places && google.maps.places.Autocomplete) {
+        // Ocultar la advertencia de deprecación de la consola para no ensuciar los logs
+        const unpatchedWarn = console.warn;
+        console.warn = function(...args) {
+          if (args[0] && typeof args[0] === 'string' && args[0].includes('google.maps.places.Autocomplete')) return;
+          unpatchedWarn.apply(console, args);
+        };
+
+        const autocomplete = new google.maps.places.Autocomplete(direccionInput, { types: ["geocode"], componentRestrictions: { country: "mx" } });
+        autocomplete.addListener('place_changed', function () {
+          const place = autocomplete.getPlace();
+          if (!place || !place.geometry) return;
+          direccionInput.value = place.formatted_address || place.name;
+        });
+
+        // Restauramos console.warn después de inicializar
+        setTimeout(() => { console.warn = unpatchedWarn; }, 2000);
+      }
+    }
+    window.__gmapsReady = __gmapsReady;
+    loadMaps();
+  </script>
+</body>
+
+</html>
