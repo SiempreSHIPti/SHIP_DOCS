@@ -38,7 +38,7 @@ steps:
       - "--memory=1Gi"
       - "--cpu=1"
       - "--timeout=300"
-      - "--set-env-vars=NODE_ENV=production,PORT=8080"
+      - "--set-env-vars=NODE_ENV=production,PORT=8080,LOCAL_DEV_MODE=false,AI_REVIEW_ONLY_MODE=false,DOCUMENT_AI_VALIDATION_ENABLED=true,DOCUMENT_AI_VALIDATION_REQUIRED=true,DOCUMENT_AI_VALIDATION_MODE=strict,GOOGLE_ARCHIVE_ENABLED=false,GEMINI_MODEL=gemini-2.5-flash,SHEET_NAME=Documentos,LOCAL_RECORDS_DIR=.local-records,LOCAL_RECORDS_EXCEL_NAME=ship_documentos.xlsx"
 
 images:
   - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_IMAGE_NAME}:$COMMIT_SHA"

@@ -113,10 +113,12 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "dockerfile_exists": true,
-  "dockerfile_uses_npm_install": true,
-  "dockerfile_no_npm_ci": true,
-  "dockerfile_copies_package_json_only_before_install": true,
-  "exceljs_dependency_present": true,
-  "pdfkit_dependency_present": true
+  "spreadsheet_optional": true,
+  "drive_parent_optional": true,
+  "cred_tmp_optional": true,
+  "google_archive_assert_exists": true,
+  "google_archive_assert_called": true,
+  "healthz_exists": true,
+  "cloudbuild_safe_env_vars": true,
+  "cloudbuild_no_comma_fallbacks": true
 }

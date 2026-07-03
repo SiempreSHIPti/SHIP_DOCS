@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const mime = require("mime-types");
-const { ENV } = require("../config/env");
+const { ENV, assertGoogleArchiveConfig } = require("../config/env");
 const { getClients } = require("../lib/google");
 
 const GOOGLE_FILE_FIELDS = [
@@ -246,6 +246,8 @@ async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayloa
       reason: "GOOGLE_ARCHIVE_ENABLED=false",
     };
   }
+
+  assertGoogleArchiveConfig();
 
   const parentId = ENV.GOOGLE_DRIVE_PARENT_FOLDER_ID || ENV.DRIVE_PARENT_FOLDER_ID;
   if (!parentId || parentId.startsWith("disabled-")) {

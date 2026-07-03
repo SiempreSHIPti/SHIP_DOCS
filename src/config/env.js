@@ -45,10 +45,10 @@ const ENV = {
 
   // ===== Google Drive / Sheets =====
   GOOGLE_ARCHIVE_ENABLED: bool("GOOGLE_ARCHIVE_ENABLED", false),
-  SPREADSHEET_ID: required("SPREADSHEET_ID"),
-  DRIVE_PARENT_FOLDER_ID: required("DRIVE_PARENT_FOLDER_ID"),
+  SPREADSHEET_ID: optional("SPREADSHEET_ID", ""),
+  DRIVE_PARENT_FOLDER_ID: optional("DRIVE_PARENT_FOLDER_ID", ""),
   GOOGLE_DRIVE_PARENT_FOLDER_ID: optional("GOOGLE_DRIVE_PARENT_FOLDER_ID", ""),
-  CRED_TMP_FOLDER_ID: required("CRED_TMP_FOLDER_ID"),
+  CRED_TMP_FOLDER_ID: optional("CRED_TMP_FOLDER_ID", ""),
   SHEET_NAME: optional("SHEET_NAME", "Documentos"),
 
   APPS_SCRIPT_WEBAPP_URL: optional("APPS_SCRIPT_WEBAPP_URL", ""),
@@ -90,4 +90,34 @@ const ENV = {
   GOOGLE_MAPS_KEY: optional("GOOGLE_MAPS_KEY", ""),
 };
 
-module.exports = { ENV };
+
+function assertGoogleArchiveConfig() {
+  const missing = [];
+
+  if (!ENV.SPREADSHEET_ID) missing.push("SPREADSHEET_ID");
+  if (!ENV.GOOGLE_DRIVE_PARENT_FOLDER_ID && !ENV.DRIVE_PARENT_FOLDER_ID) {
+    missing.push("GOOGLE_DRIVE_PARENT_FOLDER_ID o DRIVE_PARENT_FOLDER_ID");
+  }
+
+  if (missing.length) {
+    throw new Error(`GOOGLE_ARCHIVE_ENABLED=true pero faltan variables: ${missing.join(", ")}`);
+  }
+}
+
+function assertCredentialCronConfig() {
+  const missing = [];
+
+  if (!ENV.TEMPLATE_PRESENTATION_ID) missing.push("TEMPLATE_PRESENTATION_ID");
+  if (!ENV.OUTPUT_FOLDER_ID) missing.push("OUTPUT_FOLDER_ID");
+  if (!ENV.CRED_TMP_FOLDER_ID) missing.push("CRED_TMP_FOLDER_ID");
+
+  if (missing.length) {
+    throw new Error(`Credenciales por cron habilitadas pero faltan variables: ${missing.join(", ")}`);
+  }
+}
+
+module.exports = {
+  ENV,
+  assertGoogleArchiveConfig,
+  assertCredentialCronConfig,
+};

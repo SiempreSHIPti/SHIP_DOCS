@@ -1,3 +1,9 @@
+# Fix Cloud Run startup env
+
+Se corrigió el arranque en Cloud Run para que el contenedor no truene si faltan variables de Google Drive/Sheets al inicio. Ver `README-FIX-CLOUDRUN-STARTUP-ENV.md`.
+
+---
+
 # Fix Cloud Build npm ci
 
 Se corrigió el Dockerfile para evitar que Cloud Build falle cuando `package-lock.json` está desfasado frente a `package.json`. Ver `README-FIX-NPM-CI-LOCK-CLOUDBUILD.md`.

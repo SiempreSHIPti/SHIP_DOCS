@@ -79,7 +79,8 @@ function buildApp() {
   app.use(assertMiddleware("saveLocalRegistrationRouter", saveLocalRegistrationRouter));
   app.use(assertMiddleware("draftLocalRegistrationRouter", draftLocalRegistrationRouter));
 
-  // Health simple
+  // Health simple para Cloud Run y monitoreo.
+  app.get("/healthz", (_, res) => res.status(200).send("ok"));
   app.get("/api/health", (_, res) => res.json({ ok: true }));
 
   // Public config
