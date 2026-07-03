@@ -4,6 +4,8 @@ const { upload, validateUploadedFiles } = require("../middleware/upload");
 const { setJob, getJob } = require("../services/jobStore");
 const { saveRegistrationToLocalExcel, FILE_FIELDS } = require("../services/localExcelArchive");
 const { mergeDraftFilesWithUploads } = require("../services/localDraftStore");
+const { archiveRegistrationToGoogle } = require("../services/googleArchive");
+const { ENV } = require("../config/env");
 
 const router = express.Router();
 
@@ -69,18 +71,29 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
       reviewPayload: finalReview,
     });
 
+    let googleArchive = null;
+    if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+      googleArchive = await archiveRegistrationToGoogle({
+        localResult: result,
+        bodyData: result.bodyData,
+        reviewPayload: finalReview,
+      });
+    }
+
     setJob(jobId, {
       ok: true,
       state: "saved_local_excel",
       message: "Registro guardado en Excel local y credencial generada.",
       saved: true,
       localArchive: result,
+      googleArchive,
     });
 
     return res.json({
       ok: true,
       message: "Registro guardado en Excel local y credencial generada.",
       ...result,
+      googleArchive,
     });
   } catch (err) {
     console.error("❌ Error guardando registro local:", err);

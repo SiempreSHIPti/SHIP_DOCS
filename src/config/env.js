@@ -44,8 +44,10 @@ const ENV = {
   AI_REVIEW_ONLY_MODE,
 
   // ===== Google Drive / Sheets =====
+  GOOGLE_ARCHIVE_ENABLED: bool("GOOGLE_ARCHIVE_ENABLED", false),
   SPREADSHEET_ID: required("SPREADSHEET_ID"),
   DRIVE_PARENT_FOLDER_ID: required("DRIVE_PARENT_FOLDER_ID"),
+  GOOGLE_DRIVE_PARENT_FOLDER_ID: optional("GOOGLE_DRIVE_PARENT_FOLDER_ID", ""),
   CRED_TMP_FOLDER_ID: required("CRED_TMP_FOLDER_ID"),
   SHEET_NAME: optional("SHEET_NAME", "Documentos"),
 

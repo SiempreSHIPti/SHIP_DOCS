@@ -1,3 +1,27 @@
+# Fix credencial formato PowerPoint
+
+La credencial PDF que se genera al guardar el registro ahora usa el formato del PowerPoint cargado como plantilla visual. Ver `README-FIX-CREDENCIAL-FORMATO-POWERPOINT.md`.
+
+---
+
+# Fix inicio, nombre y estado de cuenta
+
+Se agregó pantalla inicial única, se corrigió escritura de espacios en nombre y se dejó sólo carga de Estado de cuenta. Ver `README-FIX-INICIO-NOMBRE-ESTADO-CUENTA.md`.
+
+---
+
+# Google Sheets + Drive + credencial SHIP
+
+Se agregó credencial PDF estilo SHIP con foto del driver y subida opcional a Google Drive/Sheets con carpeta por driver. Ver `README-GOOGLE-SHEETS-DRIVE-CREDENCIAL-SHIP.md`.
+
+---
+
+# Fix comprobante de domicilio
+
+El comprobante de domicilio ahora se acepta aunque esté a nombre de otra persona; sólo se valida que sea un comprobante real. Ver `README-FIX-COMPROBANTE-DOMICILIO.md`.
+
+---
+
 # Fix nombre normalizado y opcionales
 
 Se normaliza el nombre desde el inicio y tarjeta/póliza quedan opcionales con verde/amarillo/rojo según validez y titular. Ver `README-FIX-NOMBRE-NORMALIZADO-Y-OPCIONALES.md`.

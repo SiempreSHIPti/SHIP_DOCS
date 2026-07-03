@@ -75,6 +75,13 @@ STDOUT:
 STDERR:
 
 
+$ node --check src/services/googleArchive.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
 $ node --check src/services/processSubmission.js
 exit=0
 STDOUT:
@@ -106,13 +113,12 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "backend_normalizes_name_from_start": true,
-  "gemini_uses_normalized_name": true,
-  "tarjeta_poliza_optional_backend": true,
-  "tarjeta_optional_skip_reason": true,
-  "poliza_optional_skip_reason": true,
-  "owner_docs_warning_logic": true,
-  "green_yellow_pass_red_blocks": true,
-  "frontend_normalizes_name": true,
-  "frontend_tarjeta_optional": true
+  "pptx_front_asset": true,
+  "pptx_back_asset": true,
+  "pptx_source_included": true,
+  "uses_template_background": true,
+  "uses_driver_photo_in_diamond": true,
+  "overlays_driver_name": true,
+  "overlays_back_values": true,
+  "page_size_template_ratio": true
 }

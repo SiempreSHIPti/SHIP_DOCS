@@ -80,7 +80,7 @@ function isFileRequired(fieldName, body) {
   }
 
   if (fieldName === "estado_cuenta") {
-    return String(body.clabe_mode || "").toLowerCase() === "archivo";
+    return true; // Estado de cuenta siempre requerido; ya no existe captura manual de CLABE/banco.
   }
 
   if (fieldName === "nss_file") {
@@ -286,6 +286,33 @@ function applyOperationalRules(result, fieldName, expectedName) {
 
   const officialDocs = new Set(["curp", "nss_file", "acta", "licencia", "ine_frontal", "constancia", "estado_cuenta"]);
   const optionalOwnerDocs = new Set(["tarjeta", "poliza"]);
+  const realDocumentNoOwnerMatchRequired = new Set(["comprobante"]);
+
+  if (realDocumentNoOwnerMatchRequired.has(fieldName)) {
+    if (isDocumentValid) {
+      return {
+        ...next,
+        ok: true,
+        status: "approved",
+        severity: "success",
+        recommendation: "accept",
+        ownerCheckApplies: false,
+        ownerMatchesDriver: null,
+        ownerStatus: "not_required",
+        issues: [],
+        warnings: [],
+        summary: `${next.label || fieldName}: comprobante válido. La coincidencia de nombre no es requisito para este documento.`,
+      };
+    }
+
+    return {
+      ...next,
+      ok: false,
+      status: "rejected",
+      severity: "error",
+      recommendation: "reject",
+    };
+  }
 
   if (officialDocs.has(fieldName)) {
     next = clearNameAccentIssues(next, normalizedExpected);

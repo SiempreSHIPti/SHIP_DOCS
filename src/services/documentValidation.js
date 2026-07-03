@@ -280,6 +280,7 @@ Reglas:
 - La coincidencia de nombre debe evaluarse ignorando acentos/diacríticos y diferencias menores de mayúsculas/minúsculas. Ejemplo: JOSE = JOSÉ, MARTIN = MARTÍN, GONZALEZ = GONZÁLEZ.
 - Si es estado de cuenta, valida que parezca emitido por banco, tenga titular y CLABE/cuenta visible.
 - Si falta el titular, CLABE/cuenta o no es legible, recommendation debe ser reject o manual_review.
+- Si el documento esperado es Comprobante de domicilio, valida únicamente que sea un comprobante real/válido, legible y que contenga domicilio/emisor/periodo o datos suficientes. No lo rechaces si está a nombre de otra persona.
 - Si el documento esperado es Tarjeta de circulación o Póliza de seguro, valida que el documento sea real/válido aunque no esté a nombre del driver.
 - Para Tarjeta de circulación o Póliza de seguro, si detectas propietario/asegurado/titular, colócalo en nameFound y también en fields.ownerName, fields.propietario o fields.asegurado.
 - Para Tarjeta de circulación o Póliza de seguro, si el documento es válido pero no está a nombre del driver, no lo rechaces por nombre; usa recommendation manual_review, ok true y explica la observación.

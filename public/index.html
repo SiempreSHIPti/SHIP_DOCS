@@ -335,11 +335,30 @@
         grid-column: 1 / -1;
       }
     }
+  
+    body.pre-registration .form-header,
+    body.pre-registration #document-form,
+    body.pre-registration .progress-container,
+    body.pre-registration .left-panel {
+      display: none !important;
+    }
+    body.pre-registration .form-container {
+      width: min(720px, 100%);
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    body.pre-registration .resume-actions-card {
+      margin: 0;
+    }
+    body:not(.pre-registration) #resume-card {
+      display: none !important;
+    }
+
   </style>
 
 </head>
 
-<body>
+<body class="pre-registration">
   <div class="main-wrapper">
     <div class="left-panel">
       <div class="left-content">
@@ -499,43 +518,15 @@
                       <path d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9z" />
                     </svg>Información Bancaria</div>
                   <div class="grid">
-                    <div class="col-6">
-                      <label for="banco"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4z" />
-                        </svg>Banco Emisor <span class="required">*</span></label>
-                      <input list="bancos" type="text" id="banco" name="banco" required
-                        placeholder="Seleccione su banco" />
-                      <datalist id="bancos">
-                        <option value="BBVA"></option>
-                        <option value="Banamex"></option>
-                        <option value="Santander"></option>
-                        <option value="HSBC"></option>
-                        <option value="Banorte"></option>
-                        <option value="Scotiabank"></option>
-                        <option value="Banco Azteca"></option>
-                        <option value="Inbursa"></option>
-                      </datalist>
-                      <div class="muted">Necesario para pagos de nómina</div>
-                    </div>
-                    <div class="col-6">
-                      <label><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                    <div class="col-12" id="clabe_file_wrap">
+                      <label for="estado_cuenta"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
                           <path fill-rule="evenodd"
                             d="M18 8a6 6 0 01-7.743 5.743L10 14l-4.257-.257A6 6 0 1118 8zM10 12a4 4 0 100-8 4 4 0 000 8z"
                             clip-rule="evenodd" />
-                        </svg>CLABE Interbancaria <span class="required">*</span></label>
-                      <div class="nss-mode" style="margin-bottom:8px;">
-                        <label><input type="radio" name="clabe_mode" value="texto" checked> Digitar CLABE</label>
-                        <label><input type="radio" name="clabe_mode" value="archivo"> Subir Edo. Cuenta</label>
-                      </div>
-                      <div id="clabe_num_wrap">
-                        <input type="text" id="clabe" name="clabe" required inputmode="numeric" maxlength="18"
-                          placeholder="18 dígitos" />
-                        <div class="muted">Clave bancaria estandarizada</div>
-                      </div>
-                      <div id="clabe_file_wrap" style="display:none;">
-                        <input type="file" id="estado_cuenta" name="estado_cuenta" accept=".pdf,.jpg,.jpeg,.png" />
-                        <div class="muted">Documento con nombre y CLABE visible</div>
-                      </div>
+                        </svg>Estado de cuenta bancario <span class="required">*</span></label>
+                      <input type="hidden" id="clabe_mode" name="clabe_mode" value="archivo" />
+                      <input type="file" id="estado_cuenta" name="estado_cuenta" accept=".pdf,.jpg,.jpeg,.png" required />
+                      <div class="muted">Sube un estado de cuenta real y legible donde se observe la CLABE/datos bancarios.</div>
                     </div>
                   </div>
                 </div>
@@ -913,9 +904,7 @@
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^A-ZÑ\s]/gi, " ")
         .toUpperCase()
-        .replace(/\b(DE|DEL|LA|LAS|LOS|Y|DA|DAS|DOS)\b/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+        .replace(/\s{2,}/g, " ");
     }
 
     function normalizeCurp(v) {
@@ -951,8 +940,8 @@
           }
         });
       });
-      if (document.querySelector('input[name="clabe_mode"]:checked')) {
-        applyClabeMode(document.querySelector('input[name="clabe_mode"]:checked').value);
+      if (document.querySelector('[name="clabe_mode"]')) {
+        applyClabeMode("archivo");
       }
       if (document.querySelector('input[name="nss_mode"]:checked')) {
         applyNssMode(document.querySelector('input[name="nss_mode"]:checked').value);
@@ -962,8 +951,9 @@
     function buildFinalReviewFormData() {
       const fd = new FormData(document.getElementById("document-form"));
       fd.set("jobId", globalJobId);
-      const nombreNormalizado = normalizeNameForValidation(document.getElementById("nombre").value || "");
+      const nombreNormalizado = normalizeNameForValidation(document.getElementById("nombre").value || "").trim();
       fd.set("nombre", nombreNormalizado);
+      fd.set("clabe_mode", "archivo");
       fd.set("telefono", document.getElementById("telefono").value || "");
 
       if (loadedDraftCurp) {
@@ -1284,6 +1274,7 @@
           if (latestReviewPayload) renderReviewSummary(latestReviewPayload);
 
           note.textContent = `Avance cargado desde navegador. Si los archivos no aparecen, vuelve a subirlos.`;
+          showRegistrationInterface();
           showStep(1);
           return;
         }
@@ -1303,6 +1294,7 @@
           ? `Avance cargado. Se encontraron ${fileNames.length} archivo(s) guardados localmente; se reutilizarán si no subes archivos nuevos.`
           : "Avance cargado. No se encontraron archivos guardados; vuelve a subir documentos faltantes.";
 
+        showRegistrationInterface();
         showStep(1);
       } catch (e) {
         note.textContent = "No fue posible cargar el avance local.";
@@ -1421,32 +1413,14 @@
 
     function applyClabeMode(mode) {
       const clabeFileWrap = document.getElementById("clabe_file_wrap");
-      const clabeNumWrap = document.getElementById("clabe_num_wrap");
       const clabeFile = document.getElementById("estado_cuenta");
-      const clabeNum = document.getElementById("clabe");
+      const clabeMode = document.querySelector('[name="clabe_mode"]');
 
-      if (!clabeFileWrap || !clabeNumWrap || !clabeFile || !clabeNum) return;
-
-      if (mode === "archivo") {
-        clabeFileWrap.style.display = "";
+      if (clabeMode) clabeMode.value = "archivo";
+      if (clabeFileWrap) clabeFileWrap.style.display = "";
+      if (clabeFile) {
         clabeFile.disabled = false;
         clabeFile.required = true;
-
-        clabeNumWrap.style.display = "none";
-        clabeNum.disabled = true;
-        clabeNum.required = false;
-        clabeNum.value = "";
-        clearInvalid(clabeNum);
-      } else {
-        clabeNumWrap.style.display = "";
-        clabeNum.disabled = false;
-        clabeNum.required = true;
-
-        clabeFileWrap.style.display = "none";
-        clabeFile.disabled = true;
-        clabeFile.required = false;
-        clabeFile.value = "";
-        clearInvalid(clabeFile);
       }
     }
 
@@ -1517,7 +1491,7 @@
       latestReviewPayload = null;
       loadedDraftCurp = "";
 
-      applyClabeMode("texto");
+      applyClabeMode("archivo");
       applyNssMode("archivo");
       showStep(1);
     }
@@ -1526,27 +1500,18 @@
       const nombreEl = document.getElementById("nombre");
       const telEl = document.getElementById("telefono");
       const dirEl = document.getElementById("direccion");
-      const bancoEl = document.getElementById("banco");
-      const clabeMode = document.querySelector('input[name="clabe_mode"]:checked')?.value || "texto";
-      const clabeEl = document.getElementById("clabe");
       const edoEl = document.getElementById("estado_cuenta");
       const selfieEl = document.getElementById("selfie");
+
+      nombreEl.value = normalizeNameForValidation(nombreEl.value || "").trim();
 
       if (!nombreEl?.value.trim()) return markInvalid(nombreEl, "Ingrese su nombre completo.");
       if (!normalizePhone(telEl?.value)) return markInvalid(telEl, "Ingrese teléfono a 10 dígitos.");
       telEl.value = normalizePhone(telEl.value);
-      if (!selfieEl?.files?.length) return markInvalid(selfieEl, "Debe cargar su foto personal.");
+      if (!selfieEl?.files?.length && !loadedDraftCurp) return markInvalid(selfieEl, "Debe cargar su foto personal.");
       if (!dirEl?.value.trim()) return markInvalid(dirEl, "Ingrese dirección completa.");
-      if (!bancoEl?.value.trim()) return markInvalid(bancoEl, "Ingrese banco emisor.");
-
-      if (clabeMode === "archivo") {
-        if (!edoEl?.files?.length && !loadedDraftCurp) {
-          return markInvalid(edoEl, "Debe cargar el estado de cuenta o seleccionar digitar CLABE.");
-        }
-      } else {
-        const clabe = normalizeClabe(clabeEl?.value);
-        if (!clabe) return markInvalid(clabeEl, "Ingrese CLABE de 18 dígitos o seleccione subir estado de cuenta.");
-        clabeEl.value = clabe;
+      if (!edoEl?.files?.length && !loadedDraftCurp) {
+        return markInvalid(edoEl, "Debe cargar el estado de cuenta bancario.");
       }
 
       return true;
@@ -1654,9 +1619,17 @@
       await runFinalAiReview();
     });
 
-    applyClabeMode(document.querySelector('input[name="clabe_mode"]:checked')?.value || "texto");
+    applyClabeMode("archivo");
     applyNssMode(document.querySelector('input[name="nss_mode"]:checked')?.value || "archivo");
 
+
+    function showRegistrationInterface() {
+      document.body.classList.remove("pre-registration");
+      const resumeCard = document.getElementById("resume-card");
+      if (resumeCard) resumeCard.style.display = "none";
+      errEl.style.display = "none";
+      errEl.textContent = "";
+    }
 
     document.querySelectorAll('input[type="file"]').forEach(input => {
       input.addEventListener("change", function () {
@@ -1679,7 +1652,7 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
       latestReviewPayload = null;
       loadedDraftCurp = "";
       document.getElementById("ai-review-screen")?.classList.remove("active");
-      document.getElementById("resume-note").textContent = "Nuevo registro iniciado.";
+      showRegistrationInterface();
     });
 
     document.getElementById("load-draft-btn")?.addEventListener("click", async () => {

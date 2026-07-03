@@ -7,6 +7,9 @@ const PDFDocument = require("pdfkit");
 const mime = require("mime-types");
 const { ENV } = require("../config/env");
 
+const SHIP_CREDENTIAL_FRONT_TEMPLATE = path.join(__dirname, "../assets/credential/ship-credential-front-template.jpg");
+const SHIP_CREDENTIAL_BACK_TEMPLATE = path.join(__dirname, "../assets/credential/ship-credential-back-template.jpg");
+
 const FILE_FIELDS = [
   "selfie",
   "estado_cuenta",
@@ -49,6 +52,8 @@ const HEADER_DEFINITIONS = [
   ["clabeTxt", "CLABE"],
   ["nssMode", "Modo NSS"],
   ["nssNum", "NSS"],
+  ["rfc", "RFC"],
+  ["curpTxt", "CURP"],
   ["ref1Nombre", "Referencia 1"],
   ["ref1Tel", "Teléfono ref. 1"],
   ["ref2Nombre", "Referencia 2"],
@@ -138,7 +143,36 @@ async function ensureDir(dir) {
   await fs.mkdir(dir, { recursive: true });
 }
 
-function normalizeBody(body = {}) {
+function findReviewRow(reviewPayload, fieldName) {
+  return (reviewPayload?.results || []).find((row) => row.fieldName === fieldName) || null;
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  return "";
+}
+
+function normalizeCurp(value) {
+  const text = String(value || "").toUpperCase();
+  const match = text.match(/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/);
+  return match ? match[0] : text.replace(/[^A-Z0-9]/g, "").slice(0, 18);
+}
+
+function normalizeRfc(value) {
+  const text = String(value || "").toUpperCase();
+  const match = text.match(/[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}/);
+  return match ? match[0] : text.replace(/[^A-Z0-9Ñ&]/g, "").slice(0, 13);
+}
+
+function normalizeNss(value) {
+  const text = String(value || "");
+  const match = text.match(/\b\d{11}\b/);
+  return match ? match[0] : text.replace(/\D/g, "").slice(0, 11);
+}
+
+function normalizeBody(body = {}, reviewPayload = {}) {
   const get = (...keys) => {
     for (const key of keys) {
       const value = body[key];
@@ -147,15 +181,42 @@ function normalizeBody(body = {}) {
     return "";
   };
 
+  const curpRow = findReviewRow(reviewPayload, "curp");
+  const nssRow = findReviewRow(reviewPayload, "nss_file");
+  const constanciaRow = findReviewRow(reviewPayload, "constancia");
+
+  const curpFromReview = firstNonEmpty(
+    curpRow?.fields?.curp,
+    curpRow?.summary,
+    ...(curpRow?.issues || []),
+    ...(curpRow?.warnings || [])
+  );
+
+  const nssFromReview = firstNonEmpty(
+    nssRow?.fields?.nss,
+    nssRow?.summary,
+    ...(nssRow?.issues || []),
+    ...(nssRow?.warnings || [])
+  );
+
+  const rfcFromReview = firstNonEmpty(
+    constanciaRow?.fields?.rfc,
+    constanciaRow?.summary,
+    ...(constanciaRow?.issues || []),
+    ...(constanciaRow?.warnings || [])
+  );
+
   return {
     nombre: get("nombre").toUpperCase(),
     telefono: get("telefono").replace(/\D/g, "").slice(0, 10),
     direccion: get("direccion"),
     banco: get("banco").toUpperCase(),
-    clabeMode: get("clabe_mode"),
+    clabeMode: get("clabe_mode") || "archivo",
     clabeTxt: get("clabe", "clabeTxt").replace(/\D/g, "").slice(0, 18),
     nssMode: get("nss_mode"),
-    nssNum: get("nss_num", "nssNum").replace(/\D/g, "").slice(0, 11),
+    nssNum: normalizeNss(firstNonEmpty(get("nss_num", "nssNum"), nssFromReview)),
+    rfc: normalizeRfc(firstNonEmpty(get("rfc"), rfcFromReview)),
+    curpTxt: normalizeCurp(firstNonEmpty(get("curp_txt", "curpText", "curp_persona"), curpFromReview)),
     ref1Nombre: get("ref1_nombre", "ref1Nombre").toUpperCase(),
     ref1Tel: get("ref1_tel", "ref1Tel").replace(/\D/g, "").slice(0, 10),
     ref2Nombre: get("ref2_nombre", "ref2Nombre").toUpperCase(),
@@ -198,7 +259,280 @@ async function saveUploadedFiles({ jobId, nombre, files }) {
   return paths;
 }
 
-function createCredentialPdf({ jobId, credentialId, bodyData, reviewSummary }) {
+
+function hasTemplateImages() {
+  return fssync.existsSync(SHIP_CREDENTIAL_FRONT_TEMPLATE) && fssync.existsSync(SHIP_CREDENTIAL_BACK_TEMPLATE);
+}
+
+function drawTemplateBackground(doc, templatePath, cardW, cardH) {
+  doc.image(templatePath, 0, 0, {
+    width: cardW,
+    height: cardH,
+  });
+}
+
+function drawDiamondPhotoFromTemplate(doc, imagePath, cx, cy, halfSize) {
+  if (!imagePath || !fssync.existsSync(imagePath)) return;
+
+  const box = halfSize * 2;
+
+  doc.save();
+  doc.moveTo(cx, cy - halfSize)
+    .lineTo(cx + halfSize, cy)
+    .lineTo(cx, cy + halfSize)
+    .lineTo(cx - halfSize, cy)
+    .closePath()
+    .clip();
+
+  doc.image(imagePath, cx - halfSize, cy - halfSize, {
+    fit: [box, box],
+    align: "center",
+    valign: "center",
+  });
+  doc.restore();
+}
+
+function textShadow(doc, text, x, y, options = {}) {
+  const {
+    width = 300,
+    align = "center",
+    size = 20,
+    font = "Helvetica-Bold",
+    color = "#ffffff",
+    shadowColor = "#000000",
+    shadowOffset = 2,
+    lineGap = 2,
+  } = options;
+
+  doc.font(font).fontSize(size);
+  doc.fillColor(shadowColor).text(text, x + shadowOffset, y + shadowOffset, {
+    width,
+    align,
+    lineGap,
+  });
+  doc.fillColor(color).text(text, x, y, {
+    width,
+    align,
+    lineGap,
+  });
+}
+
+function splitNameForCredential(nombre) {
+  const clean = String(nombre || "SIN NOMBRE")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+
+  const parts = clean.split(" ").filter(Boolean);
+  if (parts.length <= 2 || clean.length <= 22) return clean;
+
+  const midpoint = Math.ceil(parts.length / 2);
+  return `${parts.slice(0, midpoint).join(" ")}\n${parts.slice(midpoint).join(" ")}`;
+}
+
+function drawHalftone(doc, x, y, w, h, color = "#8f1d25", step = 14) {
+  doc.save();
+  doc.fillColor(color);
+  for (let yy = y + 8; yy < y + h; yy += step) {
+    for (let xx = x + 8; xx < x + w; xx += step) {
+      const r = Math.max(1.2, Math.min(4.5, ((yy - y) / h) * 4.5));
+      doc.circle(xx, yy, r).fill();
+    }
+  }
+  doc.restore();
+}
+
+function drawChevronBand(doc, y, cardW) {
+  doc.save();
+  doc.fillColor("#202020");
+  doc.polygon([0, y], [cardW * 0.22, y + 92], [0, y + 184]).fill();
+  doc.polygon([cardW, y], [cardW * 0.78, y + 92], [cardW, y + 184]).fill();
+  doc.lineWidth(16).strokeColor("#ff3344");
+  doc.moveTo(0, y + 5).lineTo(cardW * 0.22, y + 92).lineTo(0, y + 179).stroke();
+  doc.moveTo(cardW, y + 5).lineTo(cardW * 0.78, y + 92).lineTo(cardW, y + 179).stroke();
+  doc.restore();
+}
+
+function drawPhotoDiamond(doc, imagePath, cx, cy, size) {
+  doc.save();
+  doc.translate(cx, cy).rotate(45);
+  doc.rect(-size / 2, -size / 2, size, size).fill("#ffffff");
+  doc.lineWidth(7).strokeColor("#111111").rect(-size / 2, -size / 2, size, size).stroke();
+  doc.lineWidth(2).strokeColor("#ffffff").rect(-size / 2 + 9, -size / 2 + 9, size - 18, size - 18).stroke();
+
+  if (imagePath && fssync.existsSync(imagePath)) {
+    doc.save();
+    doc.rect(-size / 2 + 12, -size / 2 + 12, size - 24, size - 24).clip();
+    doc.rotate(-45);
+    doc.image(imagePath, -size * 0.62, -size * 0.62, {
+      fit: [size * 1.24, size * 1.24],
+      align: "center",
+      valign: "center"
+    });
+    doc.restore();
+  }
+
+  doc.restore();
+}
+
+function drawShipCredentialFront(doc, { bodyData, filePaths }) {
+  const cardW = doc.page.width;
+  const cardH = doc.page.height;
+
+  if (hasTemplateImages()) {
+    drawTemplateBackground(doc, SHIP_CREDENTIAL_FRONT_TEMPLATE, cardW, cardH);
+
+    const selfie = filePaths?.selfie?.absolutePath;
+    // Coordenadas calibradas sobre el formato del PowerPoint.
+    drawDiamondPhotoFromTemplate(doc, selfie, cardW / 2, 235, 87);
+
+    const displayName = splitNameForCredential(bodyData.nombre);
+    textShadow(doc, displayName, 48, 498, {
+      width: cardW - 96,
+      align: "center",
+      size: 22,
+      font: "Helvetica-Bold",
+      color: "#ffffff",
+      shadowColor: "#000000",
+      shadowOffset: 2,
+      lineGap: 4,
+    });
+
+    textShadow(doc, "OPERADOR", 48, 578, {
+      width: cardW - 96,
+      align: "center",
+      size: 20,
+      font: "Helvetica",
+      color: "#ffffff",
+      shadowColor: "#000000",
+      shadowOffset: 2,
+    });
+
+    return;
+  }
+
+  // Fallback si por alguna razón no existen las imágenes del PowerPoint.
+  doc.rect(0, 0, cardW, cardH).fill("#df242b");
+  drawHalftone(doc, 0, 0, cardW, cardH, "#a51f29", 13);
+  drawChevronBand(doc, 0, cardW);
+  drawChevronBand(doc, cardH - 190, cardW);
+
+  doc.save();
+  doc.polygon([0, cardH * 0.62], [cardW / 2, cardH * 0.40], [cardW, cardH * 0.62], [cardW, cardH], [0, cardH]).fill("#242424");
+  drawHalftone(doc, 0, cardH * 0.62, cardW, cardH * 0.38, "#5c1d22", 13);
+  doc.restore();
+
+  doc.fillColor("#ffffff").font("Helvetica-BoldOblique").fontSize(31).text("SHIP", 0, 62, {
+    width: cardW,
+    align: "center",
+    oblique: true
+  });
+
+  const selfie = filePaths?.selfie?.absolutePath;
+  drawPhotoDiamond(doc, selfie, cardW / 2, 220, 150);
+
+  doc.fillColor("#ff3344").font("Helvetica-BoldOblique").fontSize(28).text("SHIP", 0, 410, {
+    width: cardW,
+    align: "center",
+  });
+
+  const name = (bodyData.nombre || "SIN NOMBRE").split(/\s+/).join(" ");
+  doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(21).text(name, 48, 470, {
+    width: cardW - 96,
+    align: "center",
+  });
+
+  doc.font("Helvetica-Bold").fontSize(22).text("OPERADOR", 48, 548, {
+    width: cardW - 96,
+    align: "center",
+  });
+
+  doc.fillColor("#ff3344").font("Helvetica-Bold").fontSize(22);
+  doc.text("»»", 38, 555);
+  doc.text("««", cardW - 82, 555);
+}
+
+function drawShipCredentialBack(doc, { bodyData }) {
+  const cardW = doc.page.width;
+  const cardH = doc.page.height;
+  const year = new Date().getFullYear();
+
+  if (hasTemplateImages()) {
+    drawTemplateBackground(doc, SHIP_CREDENTIAL_BACK_TEMPLATE, cardW, cardH);
+
+    // Coordenadas calibradas sobre el reverso del PowerPoint.
+    doc.font("Helvetica").fontSize(18).fillColor("#ffffff");
+    doc.text(String(year), 250, 137, {
+      width: 80,
+      align: "left",
+    });
+
+    const values = [
+      bodyData.nssNum || "N/A",
+      bodyData.rfc || "N/A",
+      bodyData.curpTxt || "N/A",
+    ];
+
+    doc.font("Helvetica").fontSize(21).fillColor("#ffffff");
+    doc.text(values[0], 165, 222, { width: 210, align: "left" });
+    doc.text(values[1], 165, 262, { width: 210, align: "left" });
+    doc.text(values[2], 165, 302, { width: 225, align: "left" });
+
+    return;
+  }
+
+  // Fallback si por alguna razón no existen las imágenes del PowerPoint.
+  doc.rect(0, 0, cardW, cardH).fill("#df242b");
+  drawHalftone(doc, 0, 0, cardW, cardH, "#a51f29", 13);
+
+  doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(36).text("🚚", 0, 56, {
+    width: cardW,
+    align: "center"
+  });
+
+  doc.save();
+  doc.fillColor("#252525");
+  doc.polygon([44, 138], [cardW - 44, 138], [cardW - 20, 178], [cardW - 44, 218], [44, 218], [20, 178]).fill();
+  drawHalftone(doc, 44, 138, cardW - 88, 80, "#5c1d22", 11);
+  doc.restore();
+
+  doc.fillColor("#ffffff").font("Helvetica-BoldOblique").fontSize(16).text("AÑO DE EXPEDICIÓN :", 68, 166, {
+    continued: true
+  }).font("Helvetica").fontSize(18).text(` ${year}`);
+
+  doc.save();
+  doc.rect(36, 244, cardW - 72, 132).fill("#252525");
+  doc.lineWidth(3).strokeColor("#111111").rect(36, 244, cardW - 72, 132).stroke();
+  doc.fillColor("#ffffff").fontSize(18);
+  const rows = [
+    ["NSS:", bodyData.nssNum || "N/A"],
+    ["RFC:", bodyData.rfc || "N/A"],
+    ["CURP:", bodyData.curpTxt || "N/A"],
+  ];
+  rows.forEach(([label, value], i) => {
+    const y = 270 + i * 40;
+    doc.font("Helvetica-BoldOblique").text(label, 95, y, { continued: true });
+    doc.font("Helvetica").text(` ${value}`);
+  });
+  doc.restore();
+
+  doc.save();
+  doc.polygon([0, cardH * 0.72], [cardW / 2, cardH * 0.52], [cardW, cardH * 0.72], [cardW, cardH], [0, cardH]).fill("#242424");
+  drawHalftone(doc, 0, cardH * 0.72, cardW, cardH * 0.28, "#5c1d22", 13);
+  doc.restore();
+
+  doc.strokeColor("#ffffff").lineWidth(2);
+  doc.moveTo(cardW / 2 - 48, cardH - 178).bezierCurveTo(cardW / 2 + 20, cardH - 250, cardW / 2 + 35, cardH - 90, cardW / 2 + 100, cardH - 180).stroke();
+  doc.moveTo(cardW / 2 - 88, cardH - 120).lineTo(cardW / 2 + 88, cardH - 176).stroke();
+
+  doc.fillColor("#ffffff")
+    .font("Helvetica-BoldOblique").fontSize(16)
+    .text("JESSICA I. VILLAFAÑA R.", 0, cardH - 78, { width: cardW, align: "center" })
+    .fontSize(11)
+    .text("RECURSOS HUMANOS", 0, cardH - 52, { width: cardW, align: "center" });
+}
+
+function createCredentialPdf({ jobId, credentialId, bodyData, filePaths, reviewSummary }) {
   return new Promise(async (resolve, reject) => {
     try {
       const credentialsDir = path.join(archiveRoot(), "credentials");
@@ -208,90 +542,21 @@ function createCredentialPdf({ jobId, credentialId, bodyData, reviewSummary }) {
       const abs = path.join(credentialsDir, fileName);
 
       const doc = new PDFDocument({
-        size: "A4",
-        margin: 46,
+        size: [400, 629],
+        margin: 0,
         info: {
           Title: `Credencial ${credentialId}`,
           Author: "SHIP Drivers360",
-          Subject: "Credencial de driver",
+          Subject: "Credencial de operador",
         },
       });
 
       const stream = fssync.createWriteStream(abs);
       doc.pipe(stream);
 
-      doc
-        .rect(0, 0, doc.page.width, 96)
-        .fill("#151518");
-
-      doc
-        .fillColor("#f80020")
-        .fontSize(28)
-        .font("Helvetica-Bold")
-        .text("SHIP", 46, 34, { continued: true })
-        .fillColor("#ffffff")
-        .text(" Drivers360");
-
-      doc
-        .moveDown(2)
-        .fillColor("#111827")
-        .fontSize(20)
-        .font("Helvetica-Bold")
-        .text("Credencial de Driver", 46, 130);
-
-      doc
-        .fontSize(10)
-        .fillColor("#6b7280")
-        .text(`Generada: ${nowMxIsoLike()}`, 46, 158)
-        .text(`Job ID: ${jobId}`, 46, 174)
-        .text(`ID credencial: ${credentialId}`, 46, 190);
-
-      doc
-        .roundedRect(46, 225, 500, 190, 14)
-        .strokeColor("#e5e7eb")
-        .lineWidth(1)
-        .stroke();
-
-      doc
-        .fillColor("#111827")
-        .fontSize(13)
-        .font("Helvetica-Bold")
-        .text("Nombre", 70, 250)
-        .font("Helvetica")
-        .fontSize(18)
-        .text(bodyData.nombre || "SIN NOMBRE", 70, 270, { width: 450 });
-
-      doc
-        .fontSize(11)
-        .fillColor("#374151")
-        .text(`Teléfono: ${bodyData.telefono || "N/A"}`, 70, 318)
-        .text(`Banco: ${bodyData.banco || "N/A"}`, 70, 336)
-        .text(`NSS: ${bodyData.nssNum || "N/A"}`, 70, 354)
-        .text(`Estado IA: ${reviewSummary?.canContinue ? "APROBADO" : "CON OBSERVACIONES"}`, 70, 372);
-
-      doc
-        .roundedRect(46, 445, 500, 90, 14)
-        .fillAndStroke("#f9fafb", "#e5e7eb");
-
-      doc
-        .fillColor("#111827")
-        .font("Helvetica-Bold")
-        .fontSize(12)
-        .text("Resumen de revisión documental", 70, 466)
-        .font("Helvetica")
-        .fontSize(10)
-        .text(`Aprobados: ${reviewSummary?.approved ?? 0}`, 70, 490)
-        .text(`Rechazados: ${reviewSummary?.rejected ?? 0}`, 190, 490)
-        .text(`Faltantes: ${reviewSummary?.missing ?? 0}`, 315, 490)
-        .text(`Omitidos: ${reviewSummary?.skipped ?? 0}`, 430, 490);
-
-      doc
-        .fillColor("#6b7280")
-        .fontSize(9)
-        .text("Documento generado para pruebas locales. No sustituye validación operativa final.", 46, 760, {
-          align: "center",
-          width: 500,
-        });
+      drawShipCredentialFront(doc, { bodyData, filePaths, reviewSummary });
+      doc.addPage({ size: [400, 629], margin: 0 });
+      drawShipCredentialBack(doc, { bodyData, reviewSummary });
 
       doc.end();
 
@@ -369,6 +634,8 @@ async function appendExcelRow({ jobId, credentialId, bodyData, filePaths, creden
     clabeTxt: bodyData.clabeTxt,
     nssMode: bodyData.nssMode,
     nssNum: bodyData.nssNum,
+    rfc: bodyData.rfc,
+    curpTxt: bodyData.curpTxt,
     ref1Nombre: bodyData.ref1Nombre,
     ref1Tel: bodyData.ref1Tel,
     ref2Nombre: bodyData.ref2Nombre,
@@ -414,7 +681,7 @@ async function appendExcelRow({ jobId, credentialId, bodyData, filePaths, creden
 }
 
 async function saveRegistrationToLocalExcel({ jobId, body, files, reviewPayload }) {
-  const bodyData = normalizeBody(body);
+  const bodyData = normalizeBody(body, reviewPayload);
   const createdAtCompact = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const credentialId = `SHIP-${createdAtCompact}-${String(jobId || Date.now()).slice(0, 8).toUpperCase()}`;
 
@@ -430,6 +697,7 @@ async function saveRegistrationToLocalExcel({ jobId, body, files, reviewPayload 
     jobId,
     credentialId,
     bodyData,
+    filePaths,
     reviewSummary: reviewPayload?.summary || {},
   });
 
@@ -446,6 +714,7 @@ async function saveRegistrationToLocalExcel({ jobId, body, files, reviewPayload 
     ok: true,
     jobId,
     credentialId,
+    bodyData,
     excel,
     credentialPdf,
     filePaths,
