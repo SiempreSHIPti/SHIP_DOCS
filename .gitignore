@@ -1,6 +1,4 @@
 node_modules/
-.env
-.env.*
 !.env.example
 google-credentials.json
 *.pem
