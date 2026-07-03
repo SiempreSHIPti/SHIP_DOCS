@@ -114,11 +114,9 @@ STDERR:
 TEXT_CHECKS:
 {
   "dockerfile_exists": true,
-  "dockerignore_exists": true,
-  "cloudbuild_exists": true,
-  "dockerfile_uses_node_20": true,
-  "dockerfile_runs_npm_ci": true,
-  "dockerfile_exposes_8080": true,
-  "start_script_exists": true,
-  "credential_assets_present": true
+  "dockerfile_uses_npm_install": true,
+  "dockerfile_no_npm_ci": true,
+  "dockerfile_copies_package_json_only_before_install": true,
+  "exceljs_dependency_present": true,
+  "pdfkit_dependency_present": true
 }

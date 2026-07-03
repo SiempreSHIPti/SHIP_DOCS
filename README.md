@@ -1,3 +1,9 @@
+# Fix Cloud Build npm ci
+
+Se corrigió el Dockerfile para evitar que Cloud Build falle cuando `package-lock.json` está desfasado frente a `package.json`. Ver `README-FIX-NPM-CI-LOCK-CLOUDBUILD.md`.
+
+---
+
 # Fix Cloud Build Dockerfile
 
 Se agregó `Dockerfile`, `.dockerignore` y `cloudbuild.yaml` para corregir el error de Cloud Build que no encontraba `/workspace/Dockerfile`. Ver `README-FIX-CLOUDBUILD-DOCKERFILE.md`.
