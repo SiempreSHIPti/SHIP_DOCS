@@ -154,14 +154,59 @@ async function uploadFileToDrive(drive, { parentId, localPath, name, mimeType })
   };
 }
 
+
+function sheetTitle() {
+  return String(ENV.SHEET_NAME || "Documentos").trim() || "Documentos";
+}
+
+function a1SheetName(name) {
+  // Siempre entre comillas para evitar errores de parseo si el tab tiene espacios,
+  // acentos o caracteres especiales. En A1 notation, las comillas simples internas
+  // se duplican.
+  return `'${String(name || "Documentos").replace(/'/g, "''")}'`;
+}
+
+async function ensureSheetTabExists(sheets, spreadsheetId, sheetName) {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties(sheetId,title)",
+  });
+
+  const existing = meta.data.sheets || [];
+  const found = existing.find((s) => s?.properties?.title === sheetName);
+  if (found) return found.properties;
+
+  const created = await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          addSheet: {
+            properties: {
+              title: sheetName,
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  return created.data.replies?.[0]?.addSheet?.properties || { title: sheetName };
+}
+
 async function ensureSheetHeader(sheets) {
   const spreadsheetId = ENV.SPREADSHEET_ID;
-  const sheetName = ENV.SHEET_NAME || "Documentos";
+  const sheetName = sheetTitle();
+  const quotedSheet = a1SheetName(sheetName);
+
+  await ensureSheetTabExists(sheets, spreadsheetId, sheetName);
 
   const current = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A1:AE1`,
+    range: `${quotedSheet}!A1:AF1`,
   }).catch((err) => {
+    // Si el rango aún no está disponible por consistencia eventual,
+    // continuamos y escribimos encabezados.
     if (err?.code === 400) return null;
     throw err;
   });
@@ -171,13 +216,14 @@ async function ensureSheetHeader(sheets) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!A1`,
+    range: `${quotedSheet}!A1`,
     valueInputOption: "RAW",
     requestBody: {
       values: [SHEETS_HEADERS],
     },
   });
 }
+
 
 function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, reviewPayload }) {
   const summary = reviewPayload?.summary || {};
@@ -221,13 +267,14 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
 
 async function appendToSheet(sheets, row) {
   const spreadsheetId = ENV.SPREADSHEET_ID;
-  const sheetName = ENV.SHEET_NAME || "Documentos";
+  const sheetName = sheetTitle();
+  const quotedSheet = a1SheetName(sheetName);
 
   await ensureSheetHeader(sheets);
 
   const appended = await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${sheetName}!A:AE`,
+    range: `${quotedSheet}!A:AF`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
@@ -237,6 +284,7 @@ async function appendToSheet(sheets, row) {
 
   return appended.data;
 }
+
 
 async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayload }) {
   if (!isEnabled()) {
@@ -308,6 +356,7 @@ async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayloa
       webViewLink: driverFolder.webViewLink || driveFolderUrl(driverFolder.id),
     },
     googleFiles,
+    sheetName: sheetTitle(),
     sheetAppend,
   };
 }

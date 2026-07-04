@@ -1,3 +1,9 @@
+# Fix Google Sheets tab autocreate
+
+Se corrigió el error `Unable to parse range` creando automáticamente la pestaña del Sheet si no existe y usando rangos A1 seguros. Ver `README-FIX-SHEETS-TAB-AUTOCREATE.md`.
+
+---
+
 # Fix Cloud Run startup env
 
 Se corrigió el arranque en Cloud Run para que el contenedor no truene si faltan variables de Google Drive/Sheets al inicio. Ver `README-FIX-CLOUDRUN-STARTUP-ENV.md`.

@@ -113,12 +113,10 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "spreadsheet_optional": true,
-  "drive_parent_optional": true,
-  "cred_tmp_optional": true,
-  "google_archive_assert_exists": true,
-  "google_archive_assert_called": true,
-  "healthz_exists": true,
-  "cloudbuild_safe_env_vars": true,
-  "cloudbuild_no_comma_fallbacks": true
+  "ensure_sheet_tab_exists": true,
+  "uses_spreadsheets_get_metadata": true,
+  "uses_add_sheet": true,
+  "quotes_a1_sheet_name": true,
+  "append_uses_quoted_range": true,
+  "header_uses_quoted_range": true
 }
