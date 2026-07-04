@@ -97,14 +97,14 @@ router.post("/api/registration/save-draft-local", processUploadMiddleware, async
 
     setJob(jobId, {
       state: "draft_saved_local",
-      message: `Avance guardado. Para continuar después, usa la CURP ${result.curp}.`,
+      message: `Avance guardado correctamente. Para continuar después, usa la CURP ${result.curp}.`,
       localDraft: result,
       googleDraft,
     });
 
     return res.json({
       ok: true,
-      message: `Avance guardado. Para continuar después, usa la CURP ${result.curp}.`,
+      message: `Avance guardado correctamente. Para continuar después, usa la CURP ${result.curp}.`,
       ...result,
       googleDraft,
     });

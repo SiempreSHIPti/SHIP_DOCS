@@ -1038,7 +1038,7 @@
         const input = document.querySelector(`input[type="file"][name="${CSS.escape(fieldName)}"]`);
         if (!input) return;
         const name = info.originalName || info.relativePath || "archivo guardado";
-        setFileStatus(input, "ok", `Archivo recuperado: ${shortFileName(name)}`, "Lo usaremos si no subes uno nuevo.");
+        setFileStatus(input, "ok", `Documento recuperado`, "Lo usaremos si no subes uno nuevo.");
       });
     }
 
@@ -1310,19 +1310,16 @@
 
         resultBox.style.display = "";
         resultBox.innerHTML = `
-          <strong>Registro guardado correctamente.</strong><br>
-          Excel: <a href="${data.excel?.url || '#'}" target="_blank" rel="noopener">Abrir archivo Excel</a><br>
-          Credencial: <a href="${data.credentialPdf?.url || '#'}" target="_blank" rel="noopener">Abrir credencial PDF</a><br>
-          Fila agregada: ${data.excel?.rowNumber || "N/A"}<br>
-          ID credencial: ${data.credentialId || "N/A"}
+          <strong>Registro enviado correctamente.</strong><br>
+          Gracias. Tu información fue guardada y será revisada por el equipo de SHIP.
         `;
 
         const toast = document.getElementById("draft-toast");
-        toast.textContent = "Registro guardado correctamente.";
+        toast.textContent = "Registro enviado correctamente.";
         toast.classList.add("active");
 
-        showSuccess("Registro guardado", "La carpeta, documentos, credencial y Sheet quedaron actualizados.");
-        btn.textContent = "Registro guardado";
+        showSuccess("Registro enviado", "Gracias. Tu información fue guardada correctamente.");
+        btn.textContent = "Registro enviado";
       } catch (err) {
         const msg = friendlyErrorMessage(err, "No fue posible guardar el registro.");
         errEl.textContent = msg;
@@ -1388,7 +1385,7 @@
       const toast = document.getElementById("draft-toast");
       toast.textContent = "Guardando avance…";
       toast.classList.add("active");
-      showAppModal("Guardando avance", "Estamos guardando tus archivos para que puedas continuar después.", { type: "loading" });
+      showAppModal("Guardando avance", "Estamos guardando tu avance para que puedas continuar después.", { type: "loading" });
 
       try {
         const resp = await fetch("/api/registration/save-draft-local", {
@@ -1404,9 +1401,8 @@
 
         loadedDraftCurp = data.curp || curp;
 
-        const fileCount = Object.keys(data.filePaths || {}).length;
-        toast.textContent = `Avance guardado con ${fileCount} archivo(s). Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
-        showSuccess("Avance guardado", `Guardamos ${fileCount} archivo(s). Podrás continuar con tu CURP.`);
+        toast.textContent = `Avance guardado correctamente. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
+        showSuccess("Avance guardado", "Podrás continuar después ingresando tu CURP.");
         setTimeout(() => toast.classList.remove("active"), 8000);
       } catch (err) {
         const msg = friendlyErrorMessage(err, "No fue posible guardar el avance.");
@@ -1492,13 +1488,9 @@
           showStep(1);
         }
 
-        note.textContent = fileNames.length
-          ? `Avance cargado con ${fileNames.length} archivo(s).`
-          : "Avance cargado. Vuelve a subir los documentos faltantes.";
+        note.textContent = "Avance cargado correctamente.";
 
-        showSuccess("Avance cargado", fileNames.length
-          ? `Encontramos ${fileNames.length} archivo(s). Corrige sólo lo marcado en rojo.`
-          : "No encontramos archivos guardados. Sube los documentos faltantes.");
+        showSuccess("Avance cargado", "Revisa el resumen y corrige sólo lo marcado.");
       } catch (e) {
         const msg = friendlyErrorMessage(e, "No fue posible cargar el avance.");
         note.textContent = msg;

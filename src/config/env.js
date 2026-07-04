@@ -87,7 +87,7 @@ const ENV = {
   GEMINI_API_BASE: optional("GEMINI_API_BASE", "https://generativelanguage.googleapis.com/v1beta"),
 
   // Maps
-  GOOGLE_MAPS_KEY: optional("GOOGLE_MAPS_KEY", optional("GOOGLE_MAPS_API_KEY", optional("MAPS_KEY", ""))),
+  GOOGLE_MAPS_KEY: optional("GOOGLE_MAPS_KEY", optional("GOOGLE_MAPS_BROWSER_KEY", optional("GOOGLE_MAPS_API_KEY", optional("MAPS_KEY", "")))),
 };
 
 

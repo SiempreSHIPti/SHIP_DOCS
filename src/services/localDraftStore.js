@@ -218,6 +218,7 @@ async function saveLocalDraft({ jobId, body, files, reviewPayload }) {
       relativePath: path.relative(process.cwd(), draftPath),
       url: relativeUrl(draftPath),
     },
+    data: draft.data,
     filePaths: mergedFilePaths,
     latestReviewPayload: reviewPayload,
     savedAt: draft.savedAt,

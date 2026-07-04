@@ -75,7 +75,7 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
 
     setJob(jobId, {
       state: "saving_local_excel",
-      message: "Guardando archivos, Excel local y generando credencial…",
+      message: "Guardando registro…",
     });
 
     const filesForSave = String(req.body.useDraftFiles || "") === "1" && req.body.draftCurp
@@ -109,7 +109,7 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
     setJob(jobId, {
       ok: true,
       state: "saved_local_excel",
-      message: "Registro guardado en Excel local y credencial generada.",
+      message: "Registro enviado correctamente.",
       saved: true,
       localArchive: result,
       googleArchive,
@@ -117,7 +117,7 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
 
     return res.json({
       ok: true,
-      message: "Registro guardado en Excel local y credencial generada.",
+      message: "Registro enviado correctamente.",
       ...result,
       googleArchive,
     });

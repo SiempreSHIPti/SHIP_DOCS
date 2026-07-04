@@ -113,19 +113,12 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "modal_ui": true,
-  "ia_loading_modal": true,
-  "draft_loading_modal": true,
-  "load_draft_modal": true,
-  "save_final_modal": true,
-  "friendly_ia_details": true,
-  "draft_file_status": true,
-  "draft_archive_google": true,
-  "duplicate_sheet_lookup": true,
-  "duplicate_local_registry": true,
-  "final_save_duplicate_check": true,
-  "final_review_duplicate_check": true,
-  "draft_get_duplicate_check": true,
-  "maps_fields": true,
-  "maps_key_aliases": true
+  "draft_returns_data": true,
+  "maps_browser_key_supported": true,
+  "driver_no_excel_label": true,
+  "driver_no_credential_label": true,
+  "driver_no_row_number": true,
+  "driver_no_credential_id": true,
+  "driver_success_simple": true,
+  "draft_success_simple": true
 }

@@ -1,3 +1,9 @@
+# Fix mensajes driver, draft y Maps
+
+Se corrigió el error al guardar avance, se ocultó información técnica para drivers y se agregó soporte para `GOOGLE_MAPS_BROWSER_KEY`. Ver `README-FIX-MENSAJES-DRIVER-DRAFT-MAPS.md`.
+
+---
+
 # Fix flujo operativo final
 
 Se agregaron modales, carga/continuación de avances con archivos, prevención de duplicados por CURP, guardado de borradores en Drive/Sheets, mensajes IA simplificados y dirección con Google Maps. Ver `README-FIX-FLUJO-OPERATIVO-FINAL.md`.
