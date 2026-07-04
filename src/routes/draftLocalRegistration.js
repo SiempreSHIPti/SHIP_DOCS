@@ -7,7 +7,11 @@ const {
   saveLocalDraft,
   loadLocalDraft,
   normalizeCurp,
+  getCurpFromReview,
+  findCompletedRegistration,
 } = require("../services/localDraftStore");
+const { ENV } = require("../config/env");
+const { archiveDraftToGoogle, findFinalRegistrationByCurp } = require("../services/googleArchive");
 
 const router = express.Router();
 
@@ -48,6 +52,33 @@ router.post("/api/registration/save-draft-local", processUploadMiddleware, async
   }
 
   try {
+    const curpDetected = getCurpFromReview(finalReview);
+    if (curpDetected) {
+      const localDuplicate = await findCompletedRegistration(curpDetected);
+      if (localDuplicate) {
+        return res.status(409).json({
+          ok: false,
+          duplicateRegistered: true,
+          code: "DUPLICATE_CURP",
+          error: `La CURP ${curpDetected} ya tiene un registro final. No se puede registrar de nuevo.`,
+          duplicate: localDuplicate,
+        });
+      }
+
+      if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+        const googleDuplicate = await findFinalRegistrationByCurp(curpDetected);
+        if (googleDuplicate) {
+          return res.status(409).json({
+            ok: false,
+            duplicateRegistered: true,
+            code: "DUPLICATE_CURP",
+            error: `La CURP ${curpDetected} ya tiene un registro final. No se puede registrar de nuevo.`,
+            duplicate: googleDuplicate,
+          });
+        }
+      }
+    }
+
     const result = await saveLocalDraft({
       jobId,
       body: req.body,
@@ -55,16 +86,27 @@ router.post("/api/registration/save-draft-local", processUploadMiddleware, async
       reviewPayload: finalReview,
     });
 
+    let googleDraft = null;
+    if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+      googleDraft = await archiveDraftToGoogle({
+        draftResult: result,
+        bodyData: result.data,
+        reviewPayload: finalReview,
+      });
+    }
+
     setJob(jobId, {
       state: "draft_saved_local",
       message: `Avance guardado. Para continuar después, usa la CURP ${result.curp}.`,
       localDraft: result,
+      googleDraft,
     });
 
     return res.json({
       ok: true,
       message: `Avance guardado. Para continuar después, usa la CURP ${result.curp}.`,
       ...result,
+      googleDraft,
     });
   } catch (err) {
     const message = err?.message || "No fue posible guardar el avance.";
@@ -80,6 +122,30 @@ router.get("/api/registration/draft-local/:curp", async (req, res) => {
   const curp = normalizeCurp(req.params.curp);
   if (!curp || curp.length < 18) {
     return res.status(400).json({ ok: false, error: "CURP inválida." });
+  }
+
+  const localDuplicate = await findCompletedRegistration(curp);
+  if (localDuplicate) {
+    return res.status(409).json({
+      ok: false,
+      duplicateRegistered: true,
+      code: "DUPLICATE_CURP",
+      error: `La CURP ${curp} ya tiene un registro final. No se puede registrar de nuevo.`,
+      duplicate: localDuplicate,
+    });
+  }
+
+  if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+    const googleDuplicate = await findFinalRegistrationByCurp(curp);
+    if (googleDuplicate) {
+      return res.status(409).json({
+        ok: false,
+        duplicateRegistered: true,
+        code: "DUPLICATE_CURP",
+        error: `La CURP ${curp} ya tiene un registro final. No se puede registrar de nuevo.`,
+        duplicate: googleDuplicate,
+      });
+    }
   }
 
   const draft = await loadLocalDraft(curp);

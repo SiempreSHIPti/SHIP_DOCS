@@ -3,8 +3,8 @@ const express = require("express");
 const { upload, validateUploadedFiles } = require("../middleware/upload");
 const { setJob, getJob } = require("../services/jobStore");
 const { saveRegistrationToLocalExcel, FILE_FIELDS } = require("../services/localExcelArchive");
-const { mergeDraftFilesWithUploads } = require("../services/localDraftStore");
-const { archiveRegistrationToGoogle } = require("../services/googleArchive");
+const { mergeDraftFilesWithUploads, getCurpFromReview, findCompletedRegistration, markCurpCompleted } = require("../services/localDraftStore");
+const { archiveRegistrationToGoogle, assertNoDuplicateFinalRegistration } = require("../services/googleArchive");
 const { ENV } = require("../config/env");
 
 const router = express.Router();
@@ -55,6 +55,24 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
   }
 
   try {
+    const curpDetected = getCurpFromReview(finalReview);
+    if (curpDetected) {
+      const localDuplicate = await findCompletedRegistration(curpDetected);
+      if (localDuplicate) {
+        return res.status(409).json({
+          ok: false,
+          duplicateRegistered: true,
+          code: "DUPLICATE_CURP",
+          error: `La CURP ${curpDetected} ya tiene un registro final. No se puede registrar de nuevo.`,
+          duplicate: localDuplicate,
+        });
+      }
+
+      if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+        await assertNoDuplicateFinalRegistration(curpDetected);
+      }
+    }
+
     setJob(jobId, {
       state: "saving_local_excel",
       message: "Guardando archivos, Excel local y generando credencial…",
@@ -79,6 +97,14 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
         reviewPayload: finalReview,
       });
     }
+
+    await markCurpCompleted({
+      curp: getCurpFromReview(finalReview),
+      credentialId: result.credentialId,
+      jobId,
+      googleArchive,
+      localArchive: result,
+    });
 
     setJob(jobId, {
       ok: true,
@@ -105,8 +131,12 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
       message,
     });
 
-    return res.status(500).json({
+    const status = err?.code === "DUPLICATE_CURP" ? 409 : 500;
+    return res.status(status).json({
       ok: false,
+      duplicateRegistered: err?.code === "DUPLICATE_CURP",
+      code: err?.code || "SAVE_LOCAL_ERROR",
+      duplicate: err?.duplicate || null,
       error: message,
     });
   }

@@ -28,6 +28,47 @@ function draftsRoot() {
   return path.join(archiveRoot(), "drafts");
 }
 
+function completedRegistryPath() {
+  return path.join(archiveRoot(), "completed-registrations.json");
+}
+
+async function readCompletedRegistry() {
+  const filePath = completedRegistryPath();
+  if (!fssync.existsSync(filePath)) return {};
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8")) || {};
+  } catch (_) {
+    return {};
+  }
+}
+
+async function findCompletedRegistration(curpRaw) {
+  const curp = normalizeCurp(curpRaw);
+  if (!curp || curp.length < 18) return null;
+  const registry = await readCompletedRegistry();
+  return registry[curp] || null;
+}
+
+async function markCurpCompleted({ curp, credentialId, jobId, googleArchive, localArchive }) {
+  const normalized = normalizeCurp(curp);
+  if (!normalized || normalized.length < 18) return null;
+
+  await ensureDir(archiveRoot());
+  const registry = await readCompletedRegistry();
+
+  registry[normalized] = {
+    curp: normalized,
+    credentialId: credentialId || "",
+    jobId: jobId || "",
+    savedAt: new Date().toISOString(),
+    googleFolder: googleArchive?.driverFolder?.webViewLink || "",
+    localCredential: localArchive?.credentialPdf?.relativePath || "",
+  };
+
+  await fs.writeFile(completedRegistryPath(), JSON.stringify(registry, null, 2), "utf8");
+  return registry[normalized];
+}
+
 function normalizeCurp(value) {
   return String(value || "")
     .toUpperCase()
@@ -238,4 +279,6 @@ module.exports = {
   loadLocalDraft,
   getDraftFile,
   mergeDraftFilesWithUploads,
+  findCompletedRegistration,
+  markCurpCompleted,
 };

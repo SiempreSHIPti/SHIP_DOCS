@@ -113,10 +113,19 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "ensure_sheet_tab_exists": true,
-  "uses_spreadsheets_get_metadata": true,
-  "uses_add_sheet": true,
-  "quotes_a1_sheet_name": true,
-  "append_uses_quoted_range": true,
-  "header_uses_quoted_range": true
+  "modal_ui": true,
+  "ia_loading_modal": true,
+  "draft_loading_modal": true,
+  "load_draft_modal": true,
+  "save_final_modal": true,
+  "friendly_ia_details": true,
+  "draft_file_status": true,
+  "draft_archive_google": true,
+  "duplicate_sheet_lookup": true,
+  "duplicate_local_registry": true,
+  "final_save_duplicate_check": true,
+  "final_review_duplicate_check": true,
+  "draft_get_duplicate_check": true,
+  "maps_fields": true,
+  "maps_key_aliases": true
 }

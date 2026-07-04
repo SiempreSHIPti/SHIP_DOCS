@@ -1,3 +1,9 @@
+# Fix flujo operativo final
+
+Se agregaron modales, carga/continuación de avances con archivos, prevención de duplicados por CURP, guardado de borradores en Drive/Sheets, mensajes IA simplificados y dirección con Google Maps. Ver `README-FIX-FLUJO-OPERATIVO-FINAL.md`.
+
+---
+
 # Fix Google Sheets tab autocreate
 
 Se corrigió el error `Unable to parse range` creando automáticamente la pestaña del Sheet si no existe y usando rangos A1 seguros. Ver `README-FIX-SHEETS-TAB-AUTOCREATE.md`.

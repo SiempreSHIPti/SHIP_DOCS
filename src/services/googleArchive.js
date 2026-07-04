@@ -59,6 +59,10 @@ function isEnabled() {
   return ENV.GOOGLE_ARCHIVE_ENABLED === true || ENV.GOOGLE_ARCHIVE_ENABLED === "true";
 }
 
+function normalizeCurpForLookup(value) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 18);
+}
+
 function safeName(value, fallback = "SIN_NOMBRE") {
   const clean = String(value || "")
     .normalize("NFD")
@@ -225,14 +229,15 @@ async function ensureSheetHeader(sheets) {
 }
 
 
-function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, reviewPayload }) {
+function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, reviewPayload, rowStatus }) {
   const summary = reviewPayload?.summary || {};
   const fileLink = (fieldName) => googleFiles[fieldName]?.webViewLink || "";
+  const status = rowStatus || (summary.canContinue ? (summary.warnings ? "APROBADO_CON_OBSERVACIONES" : "APROBADO") : "CON_ERRORES");
 
   return [
     nowMxIsoLike(),
-    localResult.jobId,
-    localResult.credentialId,
+    localResult.jobId || "",
+    localResult.credentialId || "",
     bodyData.nombre || "",
     bodyData.telefono || "",
     bodyData.direccion || "",
@@ -240,8 +245,8 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
     bodyData.clabeTxt || "",
     bodyData.nssNum || "",
     bodyData.rfc || "",
-    bodyData.curpTxt || "",
-    summary.canContinue ? (summary.warnings ? "APROBADO_CON_OBSERVACIONES" : "APROBADO") : "CON_ERRORES",
+    bodyData.curpTxt || localResult.curp || "",
+    status,
     summary.approved || 0,
     summary.rejected || 0,
     summary.warnings || 0,
@@ -285,6 +290,153 @@ async function appendToSheet(sheets, row) {
   return appended.data;
 }
 
+
+
+async function findFinalRegistrationByCurp(curpRaw) {
+  if (!isEnabled()) return null;
+
+  const curp = normalizeCurpForLookup(curpRaw);
+  if (!curp || curp.length < 18) return null;
+
+  assertGoogleArchiveConfig();
+
+  const { sheets } = await getClients();
+  const spreadsheetId = ENV.SPREADSHEET_ID;
+  const sheetName = sheetTitle();
+  const quotedSheet = a1SheetName(sheetName);
+
+  await ensureSheetHeader(sheets);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${quotedSheet}!A:L`,
+  }).catch((err) => {
+    if (err?.code === 400 || err?.code === 404) return { data: { values: [] } };
+    throw err;
+  });
+
+  const rows = response.data.values || [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i] || [];
+    const rowCurp = normalizeCurpForLookup(row[10] || "");
+    const status = String(row[11] || "").toUpperCase();
+
+    if (rowCurp === curp && !["BORRADOR", "AVANCE_GUARDADO", "DRAFT"].includes(status)) {
+      return {
+        rowNumber: i + 1,
+        curp,
+        status,
+        nombre: row[3] || "",
+        credentialId: row[2] || "",
+        folderLink: row[17] || "",
+        credentialLink: row[18] || "",
+      };
+    }
+  }
+
+  return null;
+}
+
+async function assertNoDuplicateFinalRegistration(curpRaw) {
+  const found = await findFinalRegistrationByCurp(curpRaw);
+  if (found) {
+    const err = new Error(`La CURP ${found.curp} ya tiene un registro final. No se puede registrar de nuevo.`);
+    err.code = "DUPLICATE_CURP";
+    err.duplicate = found;
+    throw err;
+  }
+  return true;
+}
+
+async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
+  if (!isEnabled()) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: "GOOGLE_ARCHIVE_ENABLED=false",
+    };
+  }
+
+  assertGoogleArchiveConfig();
+
+  const parentId = ENV.GOOGLE_DRIVE_PARENT_FOLDER_ID || ENV.DRIVE_PARENT_FOLDER_ID;
+  const { drive, sheets } = await getClients();
+
+  const curp = normalizeCurpForLookup(draftResult.curp || bodyData.curpTxt || "");
+  const folderName = `${safeName(bodyData.nombre)}_${safeName(curp || draftResult.jobId || "BORRADOR")}`;
+  const driverFolder = await findOrCreateFolder(drive, {
+    name: folderName,
+    parentId,
+  });
+
+  const googleFiles = {};
+  for (const [fieldName, label] of GOOGLE_FILE_FIELDS) {
+    const info = draftResult.filePaths?.[fieldName];
+    const localPath = info?.absolutePath || (info?.relativePath ? path.resolve(process.cwd(), info.relativePath) : "");
+    if (!localPath || !fs.existsSync(localPath)) continue;
+
+    const ext = path.extname(info.originalName || localPath) || path.extname(localPath);
+    googleFiles[fieldName] = await uploadFileToDrive(drive, {
+      parentId: driverFolder.id,
+      localPath,
+      name: `${label}${ext}`,
+      mimeType: info.mimeType,
+    });
+  }
+
+  const manifestPath = path.join(path.dirname(Object.values(draftResult.filePaths || {})[0]?.absolutePath || path.join(process.cwd(), "draft.json")), "draft_manifest.json");
+  try {
+    fs.writeFileSync(manifestPath, JSON.stringify({
+      type: "BORRADOR_REGISTRO_SHIP",
+      savedAt: draftResult.savedAt,
+      curp,
+      bodyData,
+      reviewPayload,
+      fileCount: Object.keys(draftResult.filePaths || {}).length,
+    }, null, 2), "utf8");
+
+    googleFiles.draftManifest = await uploadFileToDrive(drive, {
+      parentId: driverFolder.id,
+      localPath: manifestPath,
+      name: "draft_manifest.json",
+      mimeType: "application/json",
+    });
+  } catch (err) {
+    console.warn("[googleArchive] No se pudo guardar manifest de borrador:", err?.message || err);
+  }
+
+  const row = buildSheetRow({
+    localResult: {
+      jobId: draftResult.jobId,
+      credentialId: "",
+      curp,
+    },
+    googleFiles,
+    driverFolder,
+    bodyData: {
+      ...bodyData,
+      curpTxt: bodyData.curpTxt || curp,
+    },
+    reviewPayload,
+    rowStatus: "BORRADOR",
+  });
+
+  const sheetAppend = await appendToSheet(sheets, row);
+
+  return {
+    ok: true,
+    draft: true,
+    curp,
+    driverFolder: {
+      id: driverFolder.id,
+      name: driverFolder.name,
+      webViewLink: driverFolder.webViewLink || driveFolderUrl(driverFolder.id),
+    },
+    googleFiles,
+    sheetName: sheetTitle(),
+    sheetAppend,
+  };
+}
 
 async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayload }) {
   if (!isEnabled()) {
@@ -363,4 +515,7 @@ async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayloa
 
 module.exports = {
   archiveRegistrationToGoogle,
+  archiveDraftToGoogle,
+  findFinalRegistrationByCurp,
+  assertNoDuplicateFinalRegistration,
 };

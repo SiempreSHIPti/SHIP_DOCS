@@ -4,7 +4,9 @@ const { upload, validateUploadedFiles } = require("../middleware/upload");
 const { setJob, getJob } = require("../services/jobStore");
 const { validateDocument, DOC_RULES } = require("../services/documentValidation");
 const { toUpperClean, digitsOnly } = require("../utils/strings");
-const { getDraftFile } = require("../services/localDraftStore");
+const { getDraftFile, getCurpFromReview, findCompletedRegistration } = require("../services/localDraftStore");
+const { ENV } = require("../config/env");
+const { findFinalRegistrationByCurp } = require("../services/googleArchive");
 
 const router = express.Router();
 
@@ -498,6 +500,33 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
   );
 
   const summary = summarize(results);
+  const detectedCurp = getCurpFromReview({ results });
+
+  if (detectedCurp) {
+    const localDuplicate = await findCompletedRegistration(detectedCurp);
+    if (localDuplicate) {
+      return res.status(409).json({
+        ok: false,
+        duplicateRegistered: true,
+        code: "DUPLICATE_CURP",
+        error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
+        duplicate: localDuplicate,
+      });
+    }
+
+    if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+      const googleDuplicate = await findFinalRegistrationByCurp(detectedCurp);
+      if (googleDuplicate) {
+        return res.status(409).json({
+          ok: false,
+          duplicateRegistered: true,
+          code: "DUPLICATE_CURP",
+          error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
+          duplicate: googleDuplicate,
+        });
+      }
+    }
+  }
 
   setJob(jobId, {
     ok: summary.canContinue,

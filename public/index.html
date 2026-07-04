@@ -354,6 +354,92 @@
       display: none !important;
     }
 
+  
+    .app-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(0,0,0,.72);
+      backdrop-filter: blur(8px);
+    }
+    .app-modal-backdrop.active { display: flex; }
+    .app-modal-card {
+      width: min(440px, 100%);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: linear-gradient(135deg, rgba(32,18,20,.96), rgba(10,10,12,.98));
+      color: #fff;
+      padding: 22px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.55);
+      text-align: center;
+    }
+    .app-modal-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 14px;
+      background: rgba(248,0,32,.18);
+      color: #ff6474;
+      font-size: 26px;
+      font-weight: 900;
+    }
+    .app-modal-card.success .app-modal-icon {
+      background: rgba(16,185,129,.14);
+      color: #6ee7b7;
+    }
+    .app-modal-card.error .app-modal-icon {
+      background: rgba(239,68,68,.14);
+      color: #fca5a5;
+    }
+    .app-modal-spinner {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 4px solid rgba(255,255,255,.22);
+      border-top-color: #f80020;
+      animation: reviewSpin .8s linear infinite;
+    }
+    .app-modal-title {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.1;
+    }
+    .app-modal-message {
+      margin: 0;
+      color: rgba(255,255,255,.76);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+    .app-modal-actions {
+      margin-top: 18px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .app-modal-button {
+      border: 0;
+      border-radius: 14px;
+      padding: 11px 18px;
+      background: #f80020;
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .maps-help {
+      margin-top: 7px;
+      color: rgba(255,255,255,.62);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .maps-help.ok { color: #6ee7b7; }
+    .maps-help.warn { color: #fbbf24; }
+
   </style>
 
 </head>
@@ -507,7 +593,11 @@
                     </svg>Ubicación</div>
                   <label for="direccion">Dirección Completa <span class="required">*</span></label>
                   <input type="text" id="direccion" name="direccion" required
-                    placeholder="Calle, número, colonia, ciudad, código postal" />
+                    placeholder="Busca y selecciona tu dirección en Google Maps" />
+                  <input type="hidden" id="direccion_place_id" name="direccion_place_id" />
+                  <input type="hidden" id="direccion_lat" name="direccion_lat" />
+                  <input type="hidden" id="direccion_lng" name="direccion_lng" />
+                  <div class="maps-help warn" id="maps-help">Busca tu dirección y selecciona una opción de Google Maps.</div>
                 </div>
               </div>
 
@@ -882,6 +972,76 @@
     const DRAFT_PREFIX = "ship_registration_draft_curp_";
     let latestReviewPayload = null;
     let loadedDraftCurp = "";
+    let mapsAutocompleteReady = false;
+
+    function showAppModal(title, message, options = {}) {
+      const type = options.type || "loading";
+      const modal = document.getElementById("app-modal");
+      const card = document.getElementById("app-modal-card");
+      const icon = document.getElementById("app-modal-icon");
+      const actions = document.getElementById("app-modal-actions");
+
+      if (!modal || !card || !icon || !actions) return;
+
+      card.className = `app-modal-card ${type === "success" ? "success" : type === "error" ? "error" : ""}`;
+      document.getElementById("app-modal-title").textContent = title || "Procesando";
+      document.getElementById("app-modal-message").textContent = message || "Espera un momento.";
+
+      if (type === "loading") {
+        icon.innerHTML = '<span class="app-modal-spinner"></span>';
+        actions.style.display = "none";
+      } else {
+        icon.textContent = type === "success" ? "✓" : type === "error" ? "!" : "i";
+        actions.style.display = "";
+      }
+
+      modal.classList.add("active");
+    }
+
+    function closeAppModal() {
+      document.getElementById("app-modal")?.classList.remove("active");
+    }
+
+    document.addEventListener("click", (ev) => {
+      if (ev.target?.id === "app-modal-close") closeAppModal();
+    });
+
+    function showSuccess(title, message) {
+      showAppModal(title, message, { type: "success" });
+    }
+
+    function showError(title, message) {
+      showAppModal(title, message, { type: "error" });
+    }
+
+    function friendlyErrorMessage(err, fallback) {
+      const text = err?.message || String(err || "") || fallback || "Ocurrió un error.";
+      if (text.includes("DUPLICATE_CURP") || text.includes("ya tiene un registro final") || text.includes("No se puede registrar de nuevo")) {
+        return "Esta CURP ya tiene un registro final. No se puede registrar de nuevo.";
+      }
+      if (text.includes("Unable to parse range")) return "No se pudo escribir en Google Sheets. Revisa la pestaña del archivo.";
+      if (text.includes("GEMINI_API_KEY")) return "No se pudo usar la IA. Revisa la API Key.";
+      return text.length > 180 ? `${text.slice(0, 177)}...` : text;
+    }
+
+    function friendlyDetailForRow(row) {
+      const status = statusForRow(row);
+      if (status === "approved") return "Listo. Documento correcto.";
+      if (status === "skipped") return "Opcional. No bloquea el registro.";
+      if (status === "missing") return "Falta subir este documento.";
+      if (status === "warning") return "Documento válido, pero requiere revisión.";
+      return "Necesita corrección. Sube este archivo otra vez.";
+    }
+
+    function markDraftFiles(filePaths = {}) {
+      Object.entries(filePaths || {}).forEach(([fieldName, info]) => {
+        const input = document.querySelector(`input[type="file"][name="${CSS.escape(fieldName)}"]`);
+        if (!input) return;
+        const name = info.originalName || info.relativePath || "archivo guardado";
+        setFileStatus(input, "ok", `Archivo recuperado: ${shortFileName(name)}`, "Lo usaremos si no subes uno nuevo.");
+      });
+    }
+
 
     const DOC_LABELS = {
       selfie: "Foto personal / selfie",
@@ -1038,7 +1198,7 @@
         const label = row.label || DOC_LABELS[row.fieldName] || row.fieldName;
         const canReplace = status === "rejected" || status === "missing" || status === "warning";
         const fileName = row.fileName ? `<div class="review-item-file">Archivo revisado: ${row.fileName}</div>` : "";
-        const model = row.modelUsed ? `<div class="review-item-file">Modelo IA: ${row.modelUsed}</div>` : "";
+        const model = "";
         const owner = row.ownerCheckApplies
           ? `<div class="review-item-file">Titular/propietario: ${row.nameFound || "No detectado"} · ${row.ownerMatchesDriver ? "Coincide con driver" : "Observación"}</div>`
           : "";
@@ -1048,7 +1208,7 @@
             <div class="review-icon">${iconForStatus(status)}</div>
             <div>
               <div class="review-item-title">${label}</div>
-              <div class="review-item-detail">${detailForRow(row)}</div>
+              <div class="review-item-detail">${friendlyDetailForRow(row)}</div>
               ${fileName}
               ${owner}
               ${model}
@@ -1069,6 +1229,7 @@
       await runtimeConfigPromise;
 
       setBusyReview(true);
+      showAppModal("Revisando documentos", "Estamos validando tus archivos. No cierres esta ventana.", { type: "loading" });
       errEl.style.display = "none";
       errEl.textContent = "";
 
@@ -1082,13 +1243,18 @@
         const data = await resp.json().catch(() => ({}));
 
         if (!resp.ok || !data.ok) {
-          throw new Error(data.error || `Error en revisión IA (HTTP ${resp.status})`);
+          const err = new Error(data.error || `Error en revisión IA (HTTP ${resp.status})`);
+          err.payload = data;
+          throw err;
         }
 
         renderReviewSummary(data);
+        showSuccess("Revisión lista", data.summary?.canContinue ? "Tus documentos ya fueron revisados. Puedes guardar el registro." : "Hay documentos por corregir. Revisa el resumen.");
       } catch (err) {
-        errEl.textContent = err.message || "No fue posible ejecutar la revisión IA.";
+        const msg = friendlyErrorMessage(err, "No fue posible ejecutar la revisión IA.");
+        errEl.textContent = msg;
         errEl.style.display = "block";
+        showError("No se pudo validar", msg);
       } finally {
         setBusyReview(false);
       }
@@ -1101,6 +1267,8 @@
         errEl.style.display = "block";
         return false;
       }
+
+      if (loadedDraftCurp) return true;
 
       const requiredFiles = Array.from(document.querySelectorAll('input[type="file"]'))
         .filter((input) => !input.disabled && input.required);
@@ -1123,7 +1291,8 @@
       const previousText = btn.textContent;
 
       btn.disabled = true;
-      btn.textContent = "Guardando Excel y generando credencial…";
+      btn.textContent = "Guardando registro…";
+      showAppModal("Guardando registro", "Estamos guardando documentos, credencial, Drive y Sheets.", { type: "loading" });
       resultBox.style.display = "none";
       resultBox.innerHTML = "";
 
@@ -1149,13 +1318,16 @@
         `;
 
         const toast = document.getElementById("draft-toast");
-        toast.textContent = "Registro guardado en Excel local y credencial generada.";
+        toast.textContent = "Registro guardado correctamente.";
         toast.classList.add("active");
 
+        showSuccess("Registro guardado", "La carpeta, documentos, credencial y Sheet quedaron actualizados.");
         btn.textContent = "Registro guardado";
       } catch (err) {
-        errEl.textContent = err.message || "No fue posible guardar el registro.";
+        const msg = friendlyErrorMessage(err, "No fue posible guardar el registro.");
+        errEl.textContent = msg;
         errEl.style.display = "block";
+        showError("No se pudo guardar", msg);
         btn.disabled = false;
         btn.textContent = previousText;
       }
@@ -1214,8 +1386,9 @@
       }
 
       const toast = document.getElementById("draft-toast");
-      toast.textContent = "Guardando avance y rutas locales de archivos…";
+      toast.textContent = "Guardando avance…";
       toast.classList.add("active");
+      showAppModal("Guardando avance", "Estamos guardando tus archivos para que puedas continuar después.", { type: "loading" });
 
       try {
         const resp = await fetch("/api/registration/save-draft-local", {
@@ -1232,11 +1405,14 @@
         loadedDraftCurp = data.curp || curp;
 
         const fileCount = Object.keys(data.filePaths || {}).length;
-        toast.textContent = `Avance guardado con ${fileCount} archivo(s). Para continuar después, deberás ingresar tu CURP: ${loadedDraftCurp}.`;
+        toast.textContent = `Avance guardado con ${fileCount} archivo(s). Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
+        showSuccess("Avance guardado", `Guardamos ${fileCount} archivo(s). Podrás continuar con tu CURP.`);
         setTimeout(() => toast.classList.remove("active"), 8000);
       } catch (err) {
-        errEl.textContent = err.message || "No fue posible guardar el avance.";
+        const msg = friendlyErrorMessage(err, "No fue posible guardar el avance.");
+        errEl.textContent = msg;
         errEl.style.display = "block";
+        showError("No se pudo guardar el avance", msg);
       }
     }
 
@@ -1247,8 +1423,11 @@
 
       if (!curp || curp.length < 18) {
         note.textContent = "Ingresa una CURP válida de 18 caracteres.";
+        showError("CURP inválida", "Ingresa una CURP de 18 caracteres.");
         return;
       }
+
+      showAppModal("Buscando avance", "Estamos buscando tu registro y archivos guardados.", { type: "loading" });
 
       try {
         const resp = await fetch(`/api/registration/draft-local/${encodeURIComponent(curp)}`, {
@@ -1259,10 +1438,18 @@
         const data = await resp.json().catch(() => ({}));
 
         if (!resp.ok || !data.ok) {
+          if (resp.status === 409 || data.duplicateRegistered) {
+            const msg = data.error || "Esta CURP ya tiene un registro final. No se puede registrar de nuevo.";
+            note.textContent = msg;
+            showError("Registro existente", msg);
+            return;
+          }
+
           // Compatibilidad con avances antiguos en localStorage.
           const raw = localStorage.getItem(draftKey(curp));
           if (!raw) {
-            note.textContent = data.error || "No encontramos un avance local para esa CURP.";
+            note.textContent = data.error || "No encontramos un avance para esa CURP.";
+            showError("Sin avance", note.textContent);
             return;
           }
 
@@ -1271,11 +1458,16 @@
           latestReviewPayload = draft.latestReviewPayload || null;
           loadedDraftCurp = curp;
 
-          if (latestReviewPayload) renderReviewSummary(latestReviewPayload);
-
-          note.textContent = `Avance cargado desde navegador. Si los archivos no aparecen, vuelve a subirlos.`;
           showRegistrationInterface();
-          showStep(1);
+          if (latestReviewPayload) {
+            showStep(4);
+            renderReviewSummary(latestReviewPayload);
+          } else {
+            showStep(1);
+          }
+
+          note.textContent = "Avance cargado desde navegador. Si falta un archivo, vuelve a subirlo.";
+          showSuccess("Avance cargado", "Revisa el resumen y reemplaza únicamente lo que falte.");
           return;
         }
 
@@ -1284,23 +1476,35 @@
         latestReviewPayload = draft.latestReviewPayload || null;
         loadedDraftCurp = draft.curp || curp;
 
-        const fileNames = Object.values(draft.filePaths || {})
+        const filePaths = draft.filePaths || {};
+        const fileNames = Object.values(filePaths)
           .map((x) => x.originalName || x.relativePath)
           .filter(Boolean);
 
-        if (latestReviewPayload) renderReviewSummary(latestReviewPayload);
-
-        note.textContent = fileNames.length
-          ? `Avance cargado. Se encontraron ${fileNames.length} archivo(s) guardados localmente; se reutilizarán si no subes archivos nuevos.`
-          : "Avance cargado. No se encontraron archivos guardados; vuelve a subir documentos faltantes.";
+        markDraftFiles(filePaths);
 
         showRegistrationInterface();
-        showStep(1);
+
+        if (latestReviewPayload) {
+          showStep(4);
+          renderReviewSummary(latestReviewPayload);
+        } else {
+          showStep(1);
+        }
+
+        note.textContent = fileNames.length
+          ? `Avance cargado con ${fileNames.length} archivo(s).`
+          : "Avance cargado. Vuelve a subir los documentos faltantes.";
+
+        showSuccess("Avance cargado", fileNames.length
+          ? `Encontramos ${fileNames.length} archivo(s). Corrige sólo lo marcado en rojo.`
+          : "No encontramos archivos guardados. Sube los documentos faltantes.");
       } catch (e) {
-        note.textContent = "No fue posible cargar el avance local.";
+        const msg = friendlyErrorMessage(e, "No fue posible cargar el avance.");
+        note.textContent = msg;
+        showError("No se pudo cargar", msg);
       }
     }
-
 
 
     function digits(value) {
@@ -1510,6 +1714,9 @@
       telEl.value = normalizePhone(telEl.value);
       if (!selfieEl?.files?.length && !loadedDraftCurp) return markInvalid(selfieEl, "Debe cargar su foto personal.");
       if (!dirEl?.value.trim()) return markInvalid(dirEl, "Ingrese dirección completa.");
+      if (mapsAutocompleteReady && !document.getElementById("direccion_place_id")?.value) {
+        return markInvalid(dirEl, "Selecciona una dirección de la lista de Google Maps.");
+      }
       if (!edoEl?.files?.length && !loadedDraftCurp) {
         return markInvalid(edoEl, "Debe cargar el estado de cuenta bancario.");
       }
@@ -1706,30 +1913,79 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
 
     function __gmapsReady() {
       const direccionInput = document.getElementById("direccion");
+      const placeIdInput = document.getElementById("direccion_place_id");
+      const latInput = document.getElementById("direccion_lat");
+      const lngInput = document.getElementById("direccion_lng");
+      const mapsHelp = document.getElementById("maps-help");
       if (!direccionInput) return;
-      
+
       if (google.maps && google.maps.places && google.maps.places.Autocomplete) {
-        // Ocultar la advertencia de deprecación de la consola para no ensuciar los logs
+        mapsAutocompleteReady = true;
+        if (mapsHelp) {
+          mapsHelp.textContent = "Busca y selecciona una opción de Google Maps.";
+          mapsHelp.className = "maps-help warn";
+        }
+
         const unpatchedWarn = console.warn;
         console.warn = function(...args) {
           if (args[0] && typeof args[0] === 'string' && args[0].includes('google.maps.places.Autocomplete')) return;
           unpatchedWarn.apply(console, args);
         };
 
-        const autocomplete = new google.maps.places.Autocomplete(direccionInput, { types: ["geocode"], componentRestrictions: { country: "mx" } });
-        autocomplete.addListener('place_changed', function () {
-          const place = autocomplete.getPlace();
-          if (!place || !place.geometry) return;
-          direccionInput.value = place.formatted_address || place.name;
+        const autocomplete = new google.maps.places.Autocomplete(direccionInput, {
+          types: ["address"],
+          componentRestrictions: { country: "mx" },
+          fields: ["formatted_address", "geometry", "place_id", "name"]
         });
 
-        // Restauramos console.warn después de inicializar
+        direccionInput.addEventListener("input", () => {
+          if (placeIdInput) placeIdInput.value = "";
+          if (latInput) latInput.value = "";
+          if (lngInput) lngInput.value = "";
+          if (mapsHelp) {
+            mapsHelp.textContent = "Selecciona una opción de Google Maps para confirmar la dirección.";
+            mapsHelp.className = "maps-help warn";
+          }
+        });
+
+        autocomplete.addListener('place_changed', function () {
+          const place = autocomplete.getPlace();
+          if (!place || !place.geometry) {
+            if (mapsHelp) {
+              mapsHelp.textContent = "No pudimos confirmar esa dirección. Selecciona una opción de Google Maps.";
+              mapsHelp.className = "maps-help warn";
+            }
+            return;
+          }
+
+          direccionInput.value = place.formatted_address || place.name || direccionInput.value;
+          if (placeIdInput) placeIdInput.value = place.place_id || "";
+          if (latInput) latInput.value = String(place.geometry.location.lat());
+          if (lngInput) lngInput.value = String(place.geometry.location.lng());
+          if (mapsHelp) {
+            mapsHelp.textContent = "Dirección confirmada con Google Maps.";
+            mapsHelp.className = "maps-help ok";
+          }
+        });
+
         setTimeout(() => { console.warn = unpatchedWarn; }, 2000);
       }
     }
     window.__gmapsReady = __gmapsReady;
     loadMaps();
   </script>
+
+  <div class="app-modal-backdrop" id="app-modal" aria-live="polite" aria-modal="true" role="dialog">
+    <div class="app-modal-card" id="app-modal-card">
+      <div class="app-modal-icon" id="app-modal-icon">⏳</div>
+      <h3 class="app-modal-title" id="app-modal-title">Procesando</h3>
+      <p class="app-modal-message" id="app-modal-message">Espera un momento.</p>
+      <div class="app-modal-actions" id="app-modal-actions">
+        <button type="button" class="app-modal-button" id="app-modal-close">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>
