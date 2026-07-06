@@ -25,6 +25,7 @@ const SHEETS_HEADERS = [
   "Fecha registro",
   "Job ID",
   "ID credencial",
+  "Tipo de vacante",
   "Nombre completo",
   "Teléfono",
   "Dirección",
@@ -63,6 +64,19 @@ function reviewText(...values) {
     .filter(Boolean)
     .map((v) => typeof v === "object" ? JSON.stringify(v) : String(v))
     .join(" ");
+}
+
+function normalizeVacancyType(value) {
+  const raw = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  if (raw.includes("ayudante")) return "Ayudante";
+  if (raw.includes("chofer")) return "Chofer";
+  if (raw.includes("driver")) return "Driver";
+  return "";
 }
 
 function normalizeBankName(value) {
@@ -453,11 +467,11 @@ async function ensureSheetHeader(sheets) {
   const sheetName = sheetTitle();
   const quotedSheet = a1SheetName(sheetName);
 
-  await ensureSheetTabExists(sheets, spreadsheetId, sheetName);
+  const sheetProps = await ensureSheetTabExists(sheets, spreadsheetId, sheetName);
 
   const current = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${quotedSheet}!A1:AF1`,
+    range: `${quotedSheet}!A1:AG1`,
   }).catch((err) => {
     // Si el rango aún no está disponible por consistencia eventual,
     // continuamos y escribimos encabezados.
@@ -465,17 +479,40 @@ async function ensureSheetHeader(sheets) {
     throw err;
   });
 
-  const hasHeader = Array.isArray(current?.data?.values?.[0]) && current.data.values[0].length > 0;
-  if (hasHeader) return;
+  const headerRow = current?.data?.values?.[0] || [];
+  const hasHeader = Array.isArray(headerRow) && headerRow.length > 0;
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${quotedSheet}!A1`,
-    valueInputOption: "RAW",
-    requestBody: {
-      values: [SHEETS_HEADERS],
-    },
-  });
+  // Migración ligera: si el Sheet existe con el formato anterior,
+  // insertamos "Tipo de vacante" antes de "Nombre completo" para no desalinear datos históricos.
+  if (hasHeader && headerRow[3] !== "Tipo de vacante" && headerRow.includes("Nombre completo")) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{
+          insertDimension: {
+            range: {
+              sheetId: sheetProps.sheetId,
+              dimension: "COLUMNS",
+              startIndex: 3,
+              endIndex: 4,
+            },
+            inheritFromBefore: true,
+          },
+        }],
+      },
+    });
+  }
+
+  if (!hasHeader || headerRow[3] !== "Tipo de vacante") {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${quotedSheet}!A1`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [SHEETS_HEADERS],
+      },
+    });
+  }
 }
 
 
@@ -492,6 +529,7 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
     nowMxIsoLike(),
     localResult.jobId || "",
     localResult.credentialId || "",
+    normalizeVacancyType(bodyData.tipoVacante || bodyData.tipo_vacante || bodyData.vacante),
     bodyData.nombre || "",
     bodyData.telefono || "",
     bodyData.direccion || "",
@@ -533,7 +571,7 @@ async function appendToSheet(sheets, row) {
 
   const appended = await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${quotedSheet}!A:AF`,
+    range: `${quotedSheet}!A:AG`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
@@ -556,7 +594,7 @@ async function readSheetRows(sheets) {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${quotedSheet}!A:AF`,
+    range: `${quotedSheet}!A:AG`,
   }).catch((err) => {
     if (err?.code === 400 || err?.code === 404) return { data: { values: [] } };
     throw err;
@@ -566,10 +604,16 @@ async function readSheetRows(sheets) {
 }
 
 function rowStatus(row) {
+  const currentFormatStatus = String(row?.[12] || "").trim().toUpperCase();
+  if (["BORRADOR", "AVANCE_GUARDADO", "DRAFT", "APROBADO", "APROBADO_CON_OBSERVACIONES", "CON_ERRORES"].includes(currentFormatStatus)) {
+    return currentFormatStatus;
+  }
   return String(row?.[11] || "").trim().toUpperCase();
 }
 
 function rowCurp(row) {
+  const currentFormatCurp = normalizeCurpForLookup(row?.[11] || "");
+  if (currentFormatCurp && currentFormatCurp.length === 18) return currentFormatCurp;
   return normalizeCurpForLookup(row?.[10] || "");
 }
 
@@ -602,7 +646,7 @@ async function updateSheetRow(sheets, rowNumber, row) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${quotedSheet}!A${rowNumber}:AF${rowNumber}`,
+    range: `${quotedSheet}!A${rowNumber}:AG${rowNumber}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [row],

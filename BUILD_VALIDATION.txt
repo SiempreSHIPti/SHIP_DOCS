@@ -19,6 +19,13 @@ STDOUT:
 STDERR:
 
 
+$ node --check src/routes/finalDocumentReview.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
 $ node --check src/routes/saveLocalRegistration.js
 exit=0
 STDOUT:
@@ -27,6 +34,13 @@ STDERR:
 
 
 $ node --check src/routes/draftLocalRegistration.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/services/localExcelArchive.js
 exit=0
 STDOUT:
 
@@ -50,11 +64,16 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "recovered_control_css": true,
-  "hide_native_input": true,
-  "show_recovered_control_fn": true,
-  "clear_recovered_control_fn": true,
-  "mark_draft_shows_control": true,
-  "replacement_clears_control": true,
-  "hard_reset_cleans_controls": true
+  "submit_sends_to_summary": true,
+  "save_draft_in_summary_kept": true,
+  "targeted_state": true,
+  "targeted_revalidate_function": true,
+  "review_button_targeted": true,
+  "partial_fields_override": true,
+  "replace_marks_targeted": true,
+  "file_change_not_full_step_for_targeted": true,
+  "targeted_next_step_override": true,
+  "finalize_silent": true,
+  "vacancy_rules_kept": true,
+  "css_targeted": true
 }

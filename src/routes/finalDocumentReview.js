@@ -45,6 +45,47 @@ const FIELD_LABELS = {
   poliza: "Póliza de seguro",
 };
 
+
+function parsePartialFields(value) {
+  if (!value) return new Set();
+  return new Set(
+    String(value)
+      .split(",")
+      .map((x) => x.trim())
+      .filter((x) => FILE_FIELDS.includes(x))
+  );
+}
+
+function isPartialReview(body) {
+  return String(body.reviewMode || "").toLowerCase() === "partial" || parsePartialFields(body.partialFields).size > 0;
+}
+
+function isFinalizeFromPartials(body) {
+  return String(body.finalizeFromPartials || "") === "1";
+}
+
+function buildFinalResultsFromStoredValidation(body, storedValidation = {}) {
+  return FILE_FIELDS.map((fieldName) => {
+    const existing = storedValidation[fieldName];
+    if (existing) return existing;
+
+    const required = isFileRequired(fieldName, body);
+    if (!required) {
+      return buildSkippedResult(
+        fieldName,
+        fieldName === "tarjeta"
+          ? "Tarjeta de circulación no cargada. Documento opcional; no bloquea el registro."
+          : fieldName === "poliza"
+            ? "Póliza de seguro no cargada. Documento opcional; no bloquea el registro."
+            : "Documento no requerido para este registro."
+      );
+    }
+
+    return buildMissingResult(fieldName);
+  });
+}
+
+
 const uploadFields = upload.fields(FILE_FIELDS.map((name) => ({ name, maxCount: 1 })));
 
 function hasBoundary(req) {
@@ -81,9 +122,30 @@ async function getFile(req, fieldName) {
   return null;
 }
 
+function normalizeVacancyType(value) {
+  const raw = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  if (raw.includes("ayudante")) return "ayudante";
+  if (raw.includes("chofer")) return "chofer";
+  if (raw.includes("driver")) return "driver";
+  return "driver";
+}
+
+function isVehicleField(fieldName) {
+  return ["licencia", "tarjeta", "poliza"].includes(fieldName);
+}
+
 function isFileRequired(fieldName, body) {
-  if (fieldName === "tarjeta" || fieldName === "poliza") {
-    return false; // Tarjeta y póliza son opcionales: si se suben, se validan; si no, no bloquean.
+  const vacancyType = normalizeVacancyType(body?.tipo_vacante || body?.tipoVacante || body?.vacante || "driver");
+
+  if (isVehicleField(fieldName)) {
+    if (vacancyType === "driver") return true; // Driver: todo obligatorio.
+    if (vacancyType === "chofer") return fieldName === "licencia"; // Chofer: licencia obligatoria; tarjeta/póliza opcionales.
+    if (vacancyType === "ayudante") return false; // Ayudante: paso vehicular no obligatorio.
   }
 
   if (fieldName === "estado_cuenta") {
@@ -434,10 +496,18 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
   const telefono = digitsOnly(body.telefono).slice(0, 10);
   const curpTxt = toUpperClean(body.curp_txt || body.curpText || body.curp_persona || "");
 
+  const partialReview = isPartialReview(body);
+  const partialFields = parsePartialFields(body.partialFields);
+  const finalizeFromPartials = isFinalizeFromPartials(body);
+
   setJob(jobId, {
     ok: true,
-    state: "ai_final_review",
-    message: "Validando todos los documentos con IA. Esto puede tardar unos segundos…",
+    state: finalizeFromPartials ? "ai_review_finalizing_from_partials" : partialReview ? "ai_partial_review" : "ai_final_review",
+    message: finalizeFromPartials
+      ? "Preparando resumen final con validaciones previas…"
+      : partialReview
+        ? "Validando esta sección con IA…"
+        : "Validando todos los documentos con IA. Esto puede tardar unos segundos…",
     data: {
       ...(getJob(jobId)?.data || {}),
       nombre,
@@ -448,10 +518,90 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
     },
   });
 
+  if (finalizeFromPartials) {
+    const storedValidation = getJob(jobId)?.data?.documentValidation || {};
+    const results = buildFinalResultsFromStoredValidation(body, storedValidation);
+    const summary = summarize(results);
+    const detectedCurp = getCurpFromReview({ results });
+
+    if (detectedCurp) {
+      if (!useGoogleArchiveAsRegistry()) {
+        const localDuplicate = await findCompletedRegistration(detectedCurp);
+        if (localDuplicate) {
+          return res.status(409).json({
+            ok: false,
+            duplicateRegistered: true,
+            code: "DUPLICATE_CURP",
+            error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
+            duplicate: localDuplicate,
+          });
+        }
+      }
+
+      if (useGoogleArchiveAsRegistry()) {
+        const googleDuplicate = await findFinalRegistrationByCurp(detectedCurp);
+        if (googleDuplicate) {
+          return res.status(409).json({
+            ok: false,
+            duplicateRegistered: true,
+            code: "DUPLICATE_CURP",
+            error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
+            duplicate: googleDuplicate,
+          });
+        }
+      }
+    }
+
+    setJob(jobId, {
+      ok: summary.canContinue,
+      state: "ai_review_completed",
+      message: summary.canContinue
+        ? (summary.warnings ? "Documentos válidos con observaciones no bloqueantes." : "Todos los documentos fueron aprobados por IA.")
+        : "La IA detectó documentos faltantes o con errores bloqueantes.",
+      data: {
+        ...(getJob(jobId)?.data || {}),
+        nombre,
+        nombreOriginal,
+        nombreValidacion,
+        telefono,
+        curpTxt,
+        finalReview: {
+          summary,
+          results,
+          reviewedAt: new Date().toISOString(),
+          source: "partial_reviews",
+        },
+        documentValidation: results.reduce((acc, row) => {
+          acc[row.fieldName] = row;
+          return acc;
+        }, {}),
+      },
+      validationErrors: results.filter((x) => x.ok === false),
+      validationWarnings: results.filter((x) => x.status === "warning" || x.severity === "warning"),
+      finalReviewSummary: summary,
+      saved: false,
+    });
+
+    return res.json({
+      ok: true,
+      jobId,
+      state: "ai_review_completed",
+      summary,
+      results,
+      canContinue: summary.canContinue,
+      finalizedFromPartials: true,
+      message: summary.canContinue
+        ? (summary.warnings ? "Hay documentos válidos con observaciones no bloqueantes." : "Todos los documentos fueron aprobados.")
+        : "Hay documentos por corregir o cargar.",
+    });
+  }
+
   const limiter = poolLimit(2);
 
+  const fieldsToValidate = partialReview ? FILE_FIELDS.filter((fieldName) => partialFields.has(fieldName)) : FILE_FIELDS;
+
   const results = await Promise.all(
-    FILE_FIELDS.map((fieldName) =>
+    fieldsToValidate.map((fieldName) =>
       limiter(async () => {
         const required = isFileRequired(fieldName, body);
         const file = await getFile(req, fieldName);
@@ -535,32 +685,44 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
     }
   }
 
+  const previousValidation = getJob(jobId)?.data?.documentValidation || {};
+  const mergedValidation = {
+    ...previousValidation,
+    ...results.reduce((acc, row) => {
+      acc[row.fieldName] = row;
+      return acc;
+    }, {}),
+  };
+
+  const jobDataUpdate = {
+    ...(getJob(jobId)?.data || {}),
+    nombre,
+    nombreOriginal,
+    nombreValidacion,
+    telefono,
+    curpTxt,
+    documentValidation: mergedValidation,
+  };
+
+  if (!partialReview) {
+    jobDataUpdate.finalReview = {
+      summary,
+      results,
+      reviewedAt: new Date().toISOString(),
+      source: "full_review",
+    };
+  }
+
   setJob(jobId, {
     ok: summary.canContinue,
-    state: "ai_review_completed",
+    state: partialReview ? "ai_partial_review_completed" : "ai_review_completed",
     message: summary.canContinue
-      ? (summary.warnings ? "Documentos válidos con observaciones no bloqueantes." : "Todos los documentos fueron aprobados por IA.")
+      ? (summary.warnings ? "Documentos válidos con observaciones no bloqueantes." : "Documentos aprobados por IA.")
       : "La IA detectó documentos faltantes o con errores bloqueantes.",
-    data: {
-      ...(getJob(jobId)?.data || {}),
-      nombre,
-      nombreOriginal,
-      nombreValidacion,
-      telefono,
-      curpTxt,
-      finalReview: {
-        summary,
-        results,
-        reviewedAt: new Date().toISOString(),
-      },
-      documentValidation: results.reduce((acc, row) => {
-        acc[row.fieldName] = row;
-        return acc;
-      }, {}),
-    },
+    data: jobDataUpdate,
     validationErrors: results.filter((x) => x.ok === false),
     validationWarnings: results.filter((x) => x.status === "warning" || x.severity === "warning"),
-    finalReviewSummary: summary,
+    finalReviewSummary: partialReview ? null : summary,
     saved: false,
   });
 
@@ -571,6 +733,8 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
     summary,
     results,
     canContinue: summary.canContinue,
+    partialReview,
+    partialFields: Array.from(partialFields),
     message: summary.canContinue
       ? (summary.warnings ? "Hay documentos válidos con observaciones no bloqueantes." : "Todos los documentos fueron aprobados.")
       : "Hay documentos por corregir o cargar.",

@@ -479,3 +479,249 @@ body.pre-registration #resume-card h3 {
     width: 112px;
   }
 }
+
+
+
+/* ===== Validación parcial por paso ===== */
+.progress-step.completed .progress-dot {
+  background: #10b981 !important;
+  border-color: #10b981 !important;
+  color: #ffffff !important;
+}
+
+.progress-step.completed span::after {
+  content: " validado";
+  color: #10b981;
+  font-size: 10px;
+  margin-left: 4px;
+  font-weight: 900;
+}
+
+
+
+/* ===== Selector de tipo de vacante ===== */
+.vacancy-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(0,0,0,.26);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.vacancy-box.active {
+  display: block;
+}
+
+.vacancy-title {
+  color: #fff;
+  font-weight: 900;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.vacancy-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.vacancy-option {
+  text-align: left;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: #fff;
+  cursor: pointer;
+  transition: .18s ease;
+}
+
+.vacancy-option:hover,
+.vacancy-option.active {
+  border-color: rgba(248,0,32,.60);
+  background: rgba(248,0,32,.18);
+}
+
+.vacancy-option strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.vacancy-option span {
+  display: block;
+  color: rgba(255,255,255,.70);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.vacancy-rule-note {
+  margin-top: 12px;
+  margin-bottom: 14px;
+}
+
+
+
+/* ===== Snackbar profesional para validación parcial ===== */
+.section-validation-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1200;
+  min-width: min(420px, calc(100vw - 32px));
+  max-width: min(460px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(21, 21, 24, .96), rgba(38, 38, 42, .94));
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow:
+    0 22px 60px rgba(0,0,0,.45),
+    0 0 28px rgba(248,0,32,.16);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transform: translateY(24px) scale(.98);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s ease, transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+}
+
+.section-validation-toast.active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.section-toast-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(248,0,32,.16);
+  border: 1px solid rgba(248,0,32,.32);
+  color: #ff3344;
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.section-toast-content {
+  min-width: 0;
+}
+
+.section-toast-content strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.15;
+  font-weight: 900;
+  color: #ffffff;
+  margin-bottom: 3px;
+}
+
+.section-toast-content span {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255,255,255,.72);
+}
+
+.section-toast-spinner {
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  border: 3px solid rgba(255,255,255,.20);
+  border-top-color: #ff3344;
+  animation: sectionToastSpin .75s linear infinite;
+}
+
+.section-validation-toast.success {
+  border-color: rgba(16,185,129,.34);
+  box-shadow:
+    0 22px 60px rgba(0,0,0,.42),
+    0 0 28px rgba(16,185,129,.18);
+}
+
+.section-validation-toast.success .section-toast-icon {
+  background: rgba(16,185,129,.18);
+  border-color: rgba(16,185,129,.38);
+  color: #34d399;
+}
+
+.section-validation-toast.warning {
+  border-color: rgba(245,158,11,.34);
+  box-shadow:
+    0 22px 60px rgba(0,0,0,.42),
+    0 0 28px rgba(245,158,11,.16);
+}
+
+.section-validation-toast.warning .section-toast-icon {
+  background: rgba(245,158,11,.18);
+  border-color: rgba(245,158,11,.38);
+  color: #fbbf24;
+}
+
+.section-validation-toast.error {
+  border-color: rgba(248,0,32,.42);
+}
+
+.section-validation-toast.error .section-toast-icon {
+  background: rgba(248,0,32,.18);
+  border-color: rgba(248,0,32,.38);
+  color: #ff3344;
+}
+
+@keyframes sectionToastSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 720px) {
+  .section-validation-toast {
+    right: 16px;
+    left: 16px;
+    bottom: 16px;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+
+
+/* ===== Progreso: paso validando en segundo plano ===== */
+.progress-step.validating .progress-dot {
+  color: transparent !important;
+  border-color: rgba(248,0,32,.70) !important;
+  background: rgba(248,0,32,.16) !important;
+}
+
+.progress-step.validating span::after {
+  color: #ff6b7b;
+  font-size: 10px;
+  margin-left: 4px;
+  font-weight: 900;
+}
+
+.progress-dot-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.25);
+  border-top-color: #ffffff;
+  display: inline-block;
+  animation: sectionToastSpin .75s linear infinite;
+}
+
+
+
+/* ===== Resumen y revalidación dirigida ===== */
+.review-actions #review-revalidate-btn {
+  min-width: 210px;
+}
+
+.file-status.is-selected small {
+  color: rgba(255,255,255,.66);
+}

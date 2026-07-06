@@ -44,6 +44,7 @@ const HEADER_DEFINITIONS = [
   ["createdAt", "Fecha registro"],
   ["jobId", "Job ID"],
   ["credentialId", "ID credencial"],
+  ["tipoVacante", "Tipo de vacante"],
   ["nombre", "Nombre completo"],
   ["telefono", "Teléfono"],
   ["direccion", "Dirección"],
@@ -161,6 +162,19 @@ function reviewText(...values) {
     .filter(Boolean)
     .map((v) => typeof v === "object" ? JSON.stringify(v) : String(v))
     .join(" ");
+}
+
+function normalizeVacancyType(value) {
+  const raw = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  if (raw.includes("ayudante")) return "Ayudante";
+  if (raw.includes("chofer")) return "Chofer";
+  if (raw.includes("driver")) return "Driver";
+  return "";
 }
 
 function normalizeBankName(value) {
@@ -301,6 +315,7 @@ function normalizeBody(body = {}, reviewPayload = {}) {
   );
 
   return {
+    tipoVacante: normalizeVacancyType(get("tipo_vacante", "tipoVacante", "vacante")),
     nombre: get("nombre").toUpperCase(),
     telefono: get("telefono").replace(/\D/g, "").slice(0, 10),
     direccion: get("direccion"),

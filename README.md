@@ -1,3 +1,33 @@
+# Fix resumen y revalidación dirigida
+
+Se ajustó el flujo para llegar al resumen, permitir guardar avance y revalidar sólo archivos corregidos. Ver `README-FIX-RESUMEN-Y-REVALIDACION-DIRIGIDA.md`.
+
+---
+
+# Fix validación por sección en segundo plano
+
+Se ajustó la validación parcial para que el usuario avance de paso sin esperar a que termine la IA. Ver `README-FIX-VALIDACION-SECCION-SEGUNDO-PLANO.md`.
+
+---
+
+# Fix snackbar validación por sección
+
+Se reemplazó el modal bloqueante de validación parcial por un snackbar flotante profesional. Ver `README-FIX-SNACKBAR-VALIDACION-SECCION.md`.
+
+---
+
+# Fix tipo de vacante y reglas documentales
+
+Se agregó selección de tipo de vacante antes de iniciar el registro y reglas de obligatoriedad por Driver, Chofer y Ayudante. Ver `README-FIX-TIPO-VACANTE-REGLAS-DOCUMENTOS.md`.
+
+---
+
+# Fix validación parcial y credencial
+
+Se agregó validación parcial por sección, check por paso y resumen final con validaciones acumuladas. También se documentó que la credencial conserva NSS, RFC, CURP y foto personal. Ver `README-FIX-VALIDACION-PARCIAL-Y-CREDENCIAL.md`.
+
+---
+
 # Fix logo SHIP pantalla inicial
 
 Se agregó el logo SHIP dentro del card inicial, manteniendo el patrón visual actual. Ver `README-FIX-LOGO-SHIP-PANTALLA-INICIAL.md`.

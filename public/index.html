@@ -564,6 +564,23 @@
             <button type="button" class="btn-outline-soft" id="new-registration-btn">Nuevo registro</button>
             <button type="button" class="btn-outline-soft" id="show-resume-btn">Continuar registro</button>
           </div>
+          <div class="vacancy-box" id="vacancy-box">
+            <div class="vacancy-title">¿Para qué vacante aplica?</div>
+            <div class="vacancy-options">
+              <button type="button" class="vacancy-option" data-vacancy="driver">
+                <strong>Driver</strong>
+                <span>Todos los documentos son obligatorios.</span>
+              </button>
+              <button type="button" class="vacancy-option" data-vacancy="chofer">
+                <strong>Chofer</strong>
+                <span>Tarjeta de circulación y póliza son opcionales.</span>
+              </button>
+              <button type="button" class="vacancy-option" data-vacancy="ayudante">
+                <strong>Ayudante</strong>
+                <span>El paso vehicular no es obligatorio.</span>
+              </button>
+            </div>
+          </div>
           <div class="resume-box" id="resume-box">
             <div class="resume-inline">
               <div>
@@ -584,6 +601,7 @@
         <form id="document-form" enctype="multipart/form-data" novalidate autocomplete="off">
           <!-- Campo oculto para jobId -->
           <input type="hidden" id="jobId" name="jobId" />
+          <input type="hidden" id="tipo_vacante" name="tipo_vacante" value="" />
 
           <!-- 1) DATOS PERSONALES -->
           <div class="section step active" data-step="1">
@@ -982,7 +1000,7 @@
             <div class="review-list" id="review-list"></div>
 
             <div class="review-actions">
-              <button type="button" class="btn-primary-review" id="review-revalidate-btn">Validar nuevamente</button>
+              <button type="button" class="btn-primary-review" id="review-revalidate-btn">Validar archivos corregidos</button>
               <button type="button" class="btn-secondary-review" id="save-draft-btn">Guardar avance</button>
               <button type="button" class="btn-secondary-review" id="review-finish-btn">Guardar registro</button>
             </div>
@@ -1034,6 +1052,519 @@
     let loadedDraftCurp = "";
     let appModalAfterClose = null;
     let mapsAutocompleteReady = false;
+
+    const STEP_FILE_FIELDS = {
+      1: ["selfie", "estado_cuenta"],
+      2: ["ine_frontal", "ine_reverso", "curp", "nss_file", "constancia", "acta", "comprobante"],
+      3: ["licencia", "tarjeta", "poliza"],
+      4: []
+    };
+
+    const STEP_LABELS = {
+      1: "Datos personales",
+      2: "Documentos",
+      3: "Vehículo",
+      4: "Referencias"
+    };
+
+
+    const VACANCY_LABELS = {
+      driver: "Driver",
+      chofer: "Chofer",
+      ayudante: "Ayudante"
+    };
+
+    function normalizeVacancyValue(value) {
+      const raw = String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase();
+
+      if (raw.includes("ayudante")) return "ayudante";
+      if (raw.includes("chofer")) return "chofer";
+      if (raw.includes("driver")) return "driver";
+      return "";
+    }
+
+    function selectedVacancy() {
+      return normalizeVacancyValue(document.getElementById("tipo_vacante")?.value || "");
+    }
+
+    function setRequiredMark(inputId, required) {
+      const input = document.getElementById(inputId);
+      const label = document.querySelector(`label[for="${CSS.escape(inputId)}"]`);
+      if (input) input.required = !!required;
+
+      if (!label) return;
+
+      let mark = label.querySelector(".required");
+      if (required && !mark) {
+        mark = document.createElement("span");
+        mark.className = "required";
+        mark.textContent = "*";
+        label.appendChild(document.createTextNode(" "));
+        label.appendChild(mark);
+      }
+
+      if (mark) mark.style.display = required ? "" : "none";
+    }
+
+    function updateVehicleHelpText(vacancy) {
+      const vehicleStep = document.querySelector('.step[data-step="3"]');
+      if (!vehicleStep) return;
+
+      let notice = vehicleStep.querySelector(".vacancy-rule-note");
+      if (!notice) {
+        notice = document.createElement("p");
+        notice.className = "hint vacancy-rule-note";
+        vehicleStep.insertBefore(notice, vehicleStep.querySelector(".grid"));
+      }
+
+      if (vacancy === "driver") {
+        notice.textContent = "Vacante Driver: licencia, tarjeta de circulación y póliza son obligatorias.";
+      } else if (vacancy === "chofer") {
+        notice.textContent = "Vacante Chofer: licencia obligatoria; tarjeta de circulación y póliza son opcionales.";
+      } else if (vacancy === "ayudante") {
+        notice.textContent = "Vacante Ayudante: el paso vehicular es opcional. Puedes continuar sin cargar documentos de vehículo.";
+      } else {
+        notice.textContent = "Selecciona el tipo de vacante para aplicar las reglas documentales.";
+      }
+    }
+
+    function applyVacancyRules(value) {
+      const vacancy = normalizeVacancyValue(value) || "driver";
+      const vacancyInput = document.getElementById("tipo_vacante");
+      if (vacancyInput) vacancyInput.value = vacancy;
+
+      const licenciaRequired = vacancy === "driver" || vacancy === "chofer";
+      const tarjetaRequired = vacancy === "driver";
+      const polizaRequired = vacancy === "driver";
+
+      setRequiredMark("licencia", licenciaRequired);
+      setRequiredMark("tarjeta", tarjetaRequired);
+      setRequiredMark("poliza", polizaRequired);
+      updateVehicleHelpText(vacancy);
+
+      document.querySelectorAll("[data-vacancy]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.vacancy === vacancy);
+      });
+
+      const formHeader = document.querySelector(".form-header p");
+      if (formHeader) {
+        formHeader.textContent = `Vacante: ${VACANCY_LABELS[vacancy] || "No seleccionada"}. Complete los campos requeridos para continuar.`;
+      }
+
+      invalidateStep(3);
+      return vacancy;
+    }
+
+    function requireVacancyBeforeStart() {
+      const box = document.getElementById("vacancy-box");
+      if (box) box.classList.add("active");
+      showAppModal("Selecciona la vacante", "Antes de iniciar, elige si aplica como Driver, Chofer o Ayudante.", { type: "error" });
+    }
+
+
+    const stepValidationOk = { 1: false, 2: false, 3: false, 4: false };
+    const stepValidationPending = { 1: false, 2: false, 3: false, 4: false };
+    const stepValidationPromises = {};
+    const partialValidationByField = {};
+    const fieldsPendingTargetedRevalidation = new Set();
+
+    function currentStepNumber() {
+      const active = document.querySelector(".step.active");
+      return Number(active?.dataset?.step || 1);
+    }
+
+    function fieldStep(fieldName) {
+      for (const [step, fields] of Object.entries(STEP_FILE_FIELDS)) {
+        if (fields.includes(fieldName)) return Number(step);
+      }
+      return null;
+    }
+
+    function resetPartialValidationState() {
+      Object.keys(stepValidationOk).forEach((key) => stepValidationOk[key] = false);
+      Object.keys(stepValidationPending).forEach((key) => stepValidationPending[key] = false);
+      Object.keys(stepValidationPromises).forEach((key) => delete stepValidationPromises[key]);
+      Object.keys(partialValidationByField).forEach((key) => delete partialValidationByField[key]);
+      fieldsPendingTargetedRevalidation.clear();
+      document.querySelectorAll("input[data-targeted-revalidate]").forEach((input) => delete input.dataset.targetedRevalidate);
+      updateProgress(currentStepNumber());
+    }
+
+    function setStepValidated(step, ok = true) {
+      stepValidationOk[Number(step)] = !!ok;
+      stepValidationPending[Number(step)] = false;
+      updateProgress(currentStepNumber());
+    }
+
+    function invalidateStep(step) {
+      if (!step) return;
+      stepValidationOk[Number(step)] = false;
+      stepValidationPending[Number(step)] = false;
+      delete stepValidationPromises[Number(step)];
+      for (const field of STEP_FILE_FIELDS[Number(step)] || []) {
+        delete partialValidationByField[field];
+      }
+      updateProgress(currentStepNumber());
+    }
+
+    function startSectionValidation(step, fieldsOverride = null) {
+      const stepNum = Number(step);
+      if (!stepNum || stepValidationPending[stepNum]) return stepValidationPromises[stepNum] || Promise.resolve(false);
+
+      stepValidationPending[stepNum] = true;
+      stepValidationOk[stepNum] = false;
+      updateProgress(currentStepNumber());
+
+      const promise = validateSectionWithAi(stepNum, fieldsOverride)
+        .catch((err) => {
+          console.error("[section-validation] Error no controlado:", err);
+          setStepValidated(stepNum, false);
+          return false;
+        })
+        .finally(() => {
+          stepValidationPending[stepNum] = false;
+          updateProgress(currentStepNumber());
+        });
+
+      stepValidationPromises[stepNum] = promise;
+      return promise;
+    }
+
+    async function waitForPendingSectionValidations() {
+      const pending = [1, 2, 3]
+        .filter((step) => stepValidationPending[step] && stepValidationPromises[step])
+        .map((step) => stepValidationPromises[step]);
+
+      if (!pending.length) return;
+
+      showSectionValidationToast("Terminando validaciones", "Espera un momento. Estamos cerrando las validaciones pendientes antes del resumen.", {
+        type: "loading"
+      });
+
+      await Promise.allSettled(pending);
+    }
+
+    function failedLabelsFromPayload(payload) {
+      return (payload?.results || [])
+        .filter((row) => {
+          const status = statusForRow(row);
+          return status === "rejected" || status === "missing";
+        })
+        .map((row) => row.label || DOC_LABELS[row.fieldName] || row.fieldName);
+    }
+
+    function statusIsBlocking(row) {
+      const status = statusForRow(row);
+      return status === "rejected" || status === "missing";
+    }
+
+    function failedFieldsFromPayload(payload) {
+      return (payload?.results || [])
+        .filter(statusIsBlocking)
+        .map((row) => row.fieldName)
+        .filter(Boolean);
+    }
+
+    function markFieldForTargetedRevalidation(fieldName) {
+      if (!fieldName) return;
+      fieldsPendingTargetedRevalidation.add(fieldName);
+      const step = fieldStep(fieldName);
+      if (step) {
+        stepValidationOk[step] = false;
+        updateProgress(currentStepNumber());
+      }
+    }
+
+    function targetedFieldsForStep(step) {
+      const fields = STEP_FILE_FIELDS[Number(step)] || [];
+      return Array.from(fieldsPendingTargetedRevalidation).filter((field) => fields.includes(field));
+    }
+
+    function syncStepChecksFromPayload(payload) {
+      const rows = payload?.results || [];
+      for (const step of [1, 2, 3]) {
+        const fields = STEP_FILE_FIELDS[step] || [];
+        const rowsForStep = rows.filter((row) => fields.includes(row.fieldName));
+        if (!rowsForStep.length) {
+          stepValidationOk[step] = false;
+          continue;
+        }
+        stepValidationOk[step] = rowsForStep.every((row) => !statusIsBlocking(row));
+        stepValidationPending[step] = false;
+      }
+      updateProgress(currentStepNumber());
+    }
+
+    function buildPartialReviewFormData(step, fieldsOverride = null) {
+      const fields = Array.isArray(fieldsOverride) && fieldsOverride.length
+        ? fieldsOverride
+        : (STEP_FILE_FIELDS[step] || []);
+      const fd = buildFinalReviewFormData();
+      fd.set("reviewMode", "partial");
+      fd.set("partialStep", String(step || ""));
+      fd.set("partialFields", fields.join(","));
+      return fd;
+    }
+
+    async function validateSectionWithAi(step, fieldsOverride = null) {
+      await runtimeConfigPromise;
+
+      const fields = Array.isArray(fieldsOverride) && fieldsOverride.length
+        ? fieldsOverride
+        : (STEP_FILE_FIELDS[step] || []);
+      if (!fields.length) {
+        setStepValidated(step, true);
+        return true;
+      }
+
+      showSectionValidationToast(
+        `Validando ${STEP_LABELS[step] || "sección"}`,
+        "Puedes continuar con el siguiente paso. Esta validación corre en segundo plano.",
+        { type: "loading" }
+      );
+      errEl.style.display = "none";
+      errEl.textContent = "";
+
+      try {
+        const resp = await fetch("/api/registration/final-review", {
+          method: "POST",
+          body: buildPartialReviewFormData(step, fields),
+          cache: "no-store"
+        });
+
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || !data.ok) {
+          const err = new Error(data.error || `Error en validación de sección (HTTP ${resp.status})`);
+          err.payload = data;
+          throw err;
+        }
+
+        for (const row of data.results || []) {
+          partialValidationByField[row.fieldName] = row;
+          fieldsPendingTargetedRevalidation.delete(row.fieldName);
+          const input = document.querySelector(`input[type="file"][name="${CSS.escape(row.fieldName)}"]`);
+          if (input) delete input.dataset.targetedRevalidate;
+        }
+
+        if (!data.summary?.canContinue) {
+          setStepValidated(step, false);
+          const failed = failedLabelsFromPayload(data);
+          const msg = failed.length
+            ? `Corrige en este paso: ${failed.slice(0, 4).join(", ")}.`
+            : "Hay documentos por corregir en este paso.";
+
+          showSectionValidationToast("Revisa este paso", msg, {
+            type: "warning",
+            autoCloseMs: 6500
+          });
+
+          errEl.textContent = msg;
+          errEl.style.display = "block";
+          return false;
+        }
+
+        setStepValidated(step, true);
+        showSectionValidationToast("Paso validado", `${STEP_LABELS[step] || "La sección"} quedó revisada correctamente.`, {
+          type: "success",
+          autoCloseMs: 2600
+        });
+        return true;
+      } catch (err) {
+        const msg = friendlyErrorMessage(err, "No fue posible validar esta sección.");
+        setStepValidated(step, false);
+        errEl.textContent = msg;
+        errEl.style.display = "block";
+
+        showSectionValidationToast("No se pudo validar", msg, {
+          type: "error",
+          autoCloseMs: 7000
+        });
+        return false;
+      }
+    }
+
+    async function revalidateTargetedCorrectionFiles() {
+      await runtimeConfigPromise;
+
+      const failedFields = failedFieldsFromPayload(latestReviewPayload);
+      const fields = Array.from(fieldsPendingTargetedRevalidation)
+        .filter((field) => failedFields.includes(field) || !failedFields.length);
+
+      const targetFields = fields.length ? fields : failedFields;
+
+      if (!targetFields.length) {
+        showSectionValidationToast("Sin archivos pendientes", "No hay archivos con error pendientes de validar.", {
+          type: "warning",
+          autoCloseMs: 4200
+        });
+        return false;
+      }
+
+      showSectionValidationToast(
+        "Validando archivos corregidos",
+        `Sólo validaremos: ${targetFields.map((field) => DOC_LABELS[field] || field).slice(0, 4).join(", ")}.`,
+        { type: "loading" }
+      );
+
+      errEl.style.display = "none";
+      errEl.textContent = "";
+
+      try {
+        const mainStep = fieldStep(targetFields[0]) || "";
+        const resp = await fetch("/api/registration/final-review", {
+          method: "POST",
+          body: buildPartialReviewFormData(mainStep, targetFields),
+          cache: "no-store"
+        });
+
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || !data.ok) {
+          const err = new Error(data.error || `Error validando archivos corregidos (HTTP ${resp.status})`);
+          err.payload = data;
+          throw err;
+        }
+
+        for (const row of data.results || []) {
+          partialValidationByField[row.fieldName] = row;
+          fieldsPendingTargetedRevalidation.delete(row.fieldName);
+          const input = document.querySelector(`input[type="file"][name="${CSS.escape(row.fieldName)}"]`);
+          if (input) delete input.dataset.targetedRevalidate;
+        }
+
+        const failed = failedLabelsFromPayload(data);
+        if (failed.length) {
+          showSectionValidationToast("Aún hay correcciones", `Revisa: ${failed.slice(0, 4).join(", ")}.`, {
+            type: "warning",
+            autoCloseMs: 6500
+          });
+        } else {
+          showSectionValidationToast("Archivos corregidos", "Los archivos reemplazados fueron validados correctamente.", {
+            type: "success",
+            autoCloseMs: 2800
+          });
+        }
+
+        await finalizePartialReviews({ silentLoading: true });
+        return data.summary?.canContinue !== false;
+      } catch (err) {
+        const msg = friendlyErrorMessage(err, "No fue posible validar los archivos corregidos.");
+        errEl.textContent = msg;
+        errEl.style.display = "block";
+        showSectionValidationToast("No se pudo validar", msg, {
+          type: "error",
+          autoCloseMs: 7000
+        });
+        return false;
+      }
+    }
+
+    async function finalizePartialReviews(options = {}) {
+      await runtimeConfigPromise;
+
+      setBusyReview(true);
+      if (!options.silentLoading) {
+        showAppModal("Preparando resumen", "Estamos armando el resumen final con las validaciones de cada paso.", { type: "loading" });
+      }
+      errEl.style.display = "none";
+      errEl.textContent = "";
+
+      try {
+        const fd = buildFinalReviewFormData();
+        fd.set("finalizeFromPartials", "1");
+
+        const resp = await fetch("/api/registration/final-review", {
+          method: "POST",
+          body: fd,
+          cache: "no-store"
+        });
+
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok || !data.ok) {
+          const err = new Error(data.error || `Error preparando resumen (HTTP ${resp.status})`);
+          err.payload = data;
+          throw err;
+        }
+
+        latestReviewPayload = data;
+        renderReviewSummary(data);
+        setStepValidated(4, data.summary?.canContinue !== false);
+        if (!options.silentLoading) {
+          showSuccess("Resumen listo", data.summary?.canContinue ? "Ya puedes guardar el registro." : "Hay documentos por corregir. Puedes guardar avance o reemplazar sólo los archivos marcados.");
+        }
+        return true;
+      } catch (err) {
+        const msg = friendlyErrorMessage(err, "No fue posible preparar el resumen final.");
+        errEl.textContent = msg;
+        errEl.style.display = "block";
+        showError("No se pudo preparar el resumen", msg);
+        return false;
+      } finally {
+        setBusyReview(false);
+      }
+    }
+
+
+
+    let sectionToastTimer = null;
+
+    function ensureSectionValidationToast() {
+      let toast = document.getElementById("section-validation-toast");
+      if (toast) return toast;
+
+      toast = document.createElement("div");
+      toast.id = "section-validation-toast";
+      toast.className = "section-validation-toast";
+      toast.innerHTML = `
+        <div class="section-toast-icon"></div>
+        <div class="section-toast-content">
+          <strong></strong>
+          <span></span>
+        </div>
+      `;
+      document.body.appendChild(toast);
+      return toast;
+    }
+
+    function showSectionValidationToast(title, message, options = {}) {
+      const toast = ensureSectionValidationToast();
+      const type = options.type || "loading";
+      const autoCloseMs = Number(options.autoCloseMs || 0);
+      const icon = toast.querySelector(".section-toast-icon");
+      const titleEl = toast.querySelector("strong");
+      const msgEl = toast.querySelector("span");
+
+      clearTimeout(sectionToastTimer);
+
+      toast.className = `section-validation-toast active ${type}`;
+      titleEl.textContent = title || "Validando";
+      msgEl.textContent = message || "Estamos revisando esta sección.";
+
+      if (type === "loading") {
+        icon.innerHTML = '<span class="section-toast-spinner"></span>';
+      } else if (type === "success") {
+        icon.textContent = "✓";
+      } else if (type === "warning") {
+        icon.textContent = "!";
+      } else {
+        icon.textContent = "!";
+      }
+
+      if (autoCloseMs > 0) {
+        sectionToastTimer = setTimeout(() => {
+          toast.classList.remove("active");
+        }, autoCloseMs);
+      }
+
+      return toast;
+    }
+
 
     function showAppModal(title, message, options = {}) {
       const type = options.type || "loading";
@@ -1172,6 +1703,7 @@
       if (document.querySelector('input[name="nss_mode"]:checked')) {
         applyNssMode(document.querySelector('input[name="nss_mode"]:checked').value);
       }
+      applyVacancyRules(data.tipo_vacante || data.tipoVacante || data.vacante || selectedVacancy() || "driver");
     }
 
     function buildFinalReviewFormData() {
@@ -1181,6 +1713,7 @@
       fd.set("nombre", nombreNormalizado);
       fd.set("clabe_mode", "archivo");
       fd.set("telefono", document.getElementById("telefono").value || "");
+      fd.set("tipo_vacante", selectedVacancy() || "driver");
 
       if (loadedDraftCurp) {
         fd.set("draftCurp", loadedDraftCurp);
@@ -1224,6 +1757,7 @@
 
     function renderReviewSummary(payload) {
       latestReviewPayload = payload;
+      syncStepChecksFromPayload(payload);
 
       const screen = document.getElementById("ai-review-screen");
       const list = document.getElementById("review-list");
@@ -1446,7 +1980,7 @@
       const curp = getCurpFromLatestReview();
 
       if (!curp || curp.length < 18) {
-        errEl.textContent = "No fue posible guardar el avance porque la IA no detectó una CURP válida en el documento CURP. Sube un documento CURP legible y vuelve a validar.";
+        errEl.textContent = "No fue posible guardar el avance porque la IA no detectó una CURP válida en el documento CURP. Sube un documento CURP legible y vuelve al resumen para guardar avance.";
         errEl.style.display = "block";
         return;
       }
@@ -1541,6 +2075,16 @@
         fillTextData(draft.data || {});
         latestReviewPayload = draft.latestReviewPayload || null;
         loadedDraftCurp = draft.curp || curp;
+        resetPartialValidationState();
+        if (latestReviewPayload?.results?.length) {
+          for (const row of latestReviewPayload.results) {
+            partialValidationByField[row.fieldName] = row;
+          }
+          stepValidationOk[1] = true;
+          stepValidationOk[2] = true;
+          stepValidationOk[3] = true;
+          stepValidationOk[4] = true;
+        }
 
         const filePaths = draft.filePaths || {};
         const fileNames = Object.values(filePaths)
@@ -1694,12 +2238,15 @@
     function updateProgress(step) {
       document.querySelectorAll(".progress-step").forEach((stepEl, index) => {
         const stepNum = index + 1;
-        stepEl.classList.remove("active", "completed");
+        stepEl.classList.remove("active", "completed", "validating");
         const dot = stepEl.querySelector(".progress-dot");
 
-        if (stepNum < step) {
+        if (stepValidationOk[stepNum]) {
           stepEl.classList.add("completed");
           if (dot) dot.innerHTML = "✓";
+        } else if (stepValidationPending[stepNum]) {
+          stepEl.classList.add("validating");
+          if (dot) dot.innerHTML = '<span class="progress-dot-spinner"></span>';
         } else if (stepNum === step) {
           stepEl.classList.add("active");
           if (dot) dot.innerHTML = String(stepNum);
@@ -1808,6 +2355,12 @@
       document.getElementById("archive-result") && (document.getElementById("archive-result").style.display = "none");
       latestReviewPayload = null;
       loadedDraftCurp = "";
+      const vacancyInput = document.getElementById("tipo_vacante");
+      if (vacancyInput) vacancyInput.value = "";
+      document.getElementById("vacancy-box")?.classList.remove("active");
+      document.querySelectorAll("[data-vacancy]").forEach((btn) => btn.classList.remove("active"));
+      resetPartialValidationState();
+      resetPartialValidationState();
       for (const id of ["direccion_place_id", "direccion_lat", "direccion_lng"]) {
         const el = document.getElementById(id);
         if (el) el.value = "";
@@ -1873,12 +2426,24 @@
     }
 
     function validateStep3() {
+      const vacancy = selectedVacancy() || "driver";
       const licencia = document.getElementById("licencia");
+      const tarjeta = document.getElementById("tarjeta");
+      const poliza = document.getElementById("poliza");
 
-      if (!licencia?.files?.length && !loadedDraftCurp) return markInvalid(licencia, "Debe cargar licencia de conducir.");
+      if (vacancy === "ayudante") {
+        return true;
+      }
 
-      // Tarjeta de circulación y póliza son opcionales.
-      // Si se cargan, se validan con IA; si no se cargan, no bloquean el registro.
+      if ((vacancy === "driver" || vacancy === "chofer") && !licencia?.files?.length && !loadedDraftCurp) {
+        return markInvalid(licencia, "Debe cargar licencia de conducir.");
+      }
+
+      if (vacancy === "driver") {
+        if (!tarjeta?.files?.length && !loadedDraftCurp) return markInvalid(tarjeta, "Debe cargar tarjeta de circulación.");
+        if (!poliza?.files?.length && !loadedDraftCurp) return markInvalid(poliza, "Debe cargar póliza de seguro vehicular.");
+      }
+
       return true;
     }
 
@@ -1923,16 +2488,19 @@
 
     document.getElementById("next-1")?.addEventListener("click", () => {
       if (!validateStep1()) return;
+      startSectionValidation(1, targetedFieldsForStep(1));
       showStep(2);
     });
 
     document.getElementById("next-2")?.addEventListener("click", () => {
       if (!validateStep2()) return;
+      startSectionValidation(2, targetedFieldsForStep(2));
       showStep(3);
     });
 
     document.getElementById("next-3")?.addEventListener("click", () => {
       if (!validateStep3()) return;
+      startSectionValidation(3, targetedFieldsForStep(3));
       showStep(4);
     });
 
@@ -1948,7 +2516,10 @@
       if (!validateFileSizes()) return;
       if (!validateStep4()) return;
 
-      await runFinalAiReview();
+      setStepValidated(4, true);
+      await waitForPendingSectionValidations();
+
+      await finalizePartialReviews();
     });
 
     applyClabeMode("archivo");
@@ -1982,7 +2553,14 @@ function showRegistrationInterface() {
         const f = (this.files || [])[0];
         if (!f) return;
         clearRecoveredFileControl(this);
-        setFileStatus(this, "selected", `Archivo seleccionado: ${shortFileName(f.name)}`, "Lo revisaremos con IA al finalizar el registro.");
+        if (this.dataset.targetedRevalidate === "1" || document.getElementById("ai-review-screen")?.classList.contains("active")) {
+          markFieldForTargetedRevalidation(this.name);
+          delete partialValidationByField[this.name];
+          setFileStatus(this, "selected", `Archivo corregido: ${shortFileName(f.name)}`, "Sólo este archivo se validará de nuevo desde el resumen.");
+        } else {
+          invalidateStep(fieldStep(this.name));
+          setFileStatus(this, "selected", `Archivo seleccionado: ${shortFileName(f.name)}`, "Lo revisaremos al continuar este paso.");
+        }
       });
     });
 document.getElementById("resume-curp")?.addEventListener("input", (e) => {
@@ -2000,7 +2578,20 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
       latestReviewPayload = null;
       loadedDraftCurp = "";
       document.getElementById("ai-review-screen")?.classList.remove("active");
-      showRegistrationInterface();
+      const vacancyBox = document.getElementById("vacancy-box");
+      if (vacancyBox) vacancyBox.classList.add("active");
+      document.getElementById("resume-note").textContent = "Selecciona la vacante para aplicar los documentos obligatorios.";
+    });
+
+    document.querySelectorAll("[data-vacancy]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        hardResetForm();
+        const vacancy = applyVacancyRules(btn.dataset.vacancy);
+        document.getElementById("vacancy-box")?.classList.add("active");
+        showRegistrationInterface();
+        showStep(1);
+        showSuccess("Vacante seleccionada", `Aplicarás como ${VACANCY_LABELS[vacancy] || vacancy}.`);
+      });
     });
 
     document.getElementById("load-draft-btn")?.addEventListener("click", async () => {
@@ -2010,7 +2601,7 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
     document.getElementById("save-draft-btn")?.addEventListener("click", saveDraftForLater);
 
     document.getElementById("review-revalidate-btn")?.addEventListener("click", async () => {
-      await runFinalAiReview();
+      await revalidateTargetedCorrectionFiles();
     });
 
     document.getElementById("review-finish-btn")?.addEventListener("click", saveRegistrationAndGenerateCredential);
@@ -2022,6 +2613,8 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
       const input = document.querySelector(`input[type="file"][name="${CSS.escape(field)}"]`);
       if (!input) return;
 
+      input.dataset.targetedRevalidate = "1";
+      markFieldForTargetedRevalidation(field);
       const step = input.closest(".step")?.dataset?.step;
       if (step) showStep(Number(step));
 
