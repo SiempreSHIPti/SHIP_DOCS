@@ -1,3 +1,9 @@
+# Fix visual archivos recuperados
+
+Se corrigió la vista de archivos recuperados para que no se vea “Sin archivos seleccionados” cuando el backend ya tiene un documento cargado. Ver `README-FIX-INPUT-ARCHIVOS-RECUPERADOS.md`.
+
+---
+
 # Fix sin borrador final, un registro y compresión
 
 Se corrigió el flujo para que al guardar final se actualice la fila BORRADOR en Sheets, se elimine el borrador local, se renombren documentos por columna y se compriman imágenes antes de subir a Drive. Ver `README-FIX-SIN-BORRADOR-UN-REGISTRO-COMPRESION.md`.
