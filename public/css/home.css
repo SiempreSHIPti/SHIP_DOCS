@@ -237,4 +237,245 @@
       label { margin-left: 5px; }
       input[type="text"], input[type="file"] { padding: 10px 15px; }
       .nss-mode { flex-direction: column; gap: 10px; padding: 12px 15px; }
-    }
+    }
+
+
+
+
+
+
+
+/* ===== Pantalla inicial siguiendo patrón del formulario ===== */
+body.pre-registration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 60px 20px;
+}
+
+body.pre-registration .main-wrapper {
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  min-height: 560px;
+  align-items: center;
+}
+
+body.pre-registration .left-panel {
+  display: flex;
+  min-height: 500px;
+}
+
+body.pre-registration .left-panel .logo-container {
+  display: block;
+}
+
+body.pre-registration .right-panel {
+  min-height: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.pre-registration .progress-container {
+  display: none;
+}
+
+body.pre-registration .form-container {
+  width: min(620px, 100%);
+  margin: 0;
+  padding: 42px;
+  border-radius: 22px;
+}
+
+body.pre-registration .form-header,
+body.pre-registration #document-form,
+body.pre-registration #ai-review-screen {
+  display: none;
+}
+
+body.pre-registration #resume-card {
+  display: block;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.resume-kicker {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 11px;
+  margin-bottom: 14px;
+  background: rgba(248, 0, 32, .12);
+  color: #ff5a6b;
+  border: 1px solid rgba(248, 0, 32, .25);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+body.pre-registration #resume-card h3 {
+  font-family: 'Squada One', sans-serif;
+  font-style: italic;
+  font-weight: normal;
+  font-size: clamp(38px, 4.5vw, 56px);
+  line-height: .95;
+  letter-spacing: 1px;
+  margin: 0 0 10px;
+  color: #ffffff;
+}
+
+body.pre-registration #resume-card .resume-intro {
+  color: rgba(255,255,255,.72);
+  font-size: 15px;
+  line-height: 1.45;
+  margin: 0 0 18px;
+  max-width: 420px;
+}
+
+.resume-trust-note {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border-radius: 15px;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.11);
+}
+
+.resume-trust-note strong {
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.resume-trust-note span {
+  color: rgba(255,255,255,.68);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+body.pre-registration #resume-card h4 {
+  margin: 0 0 8px;
+  color: #ffffff;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+body.pre-registration #resume-card h4 + p,
+body.pre-registration #resume-card > p:not(.resume-intro) {
+  color: rgba(255,255,255,.68);
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 16px;
+}
+
+body.pre-registration .resume-actions-row {
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+body.pre-registration .btn-outline-soft {
+  min-height: 50px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.075);
+  border-color: rgba(255,255,255,.14);
+}
+
+body.pre-registration .btn-outline-soft:hover {
+  background: rgba(248,0,32,.18);
+  border-color: rgba(248,0,32,.35);
+}
+
+body.pre-registration .resume-box {
+  margin-top: 16px;
+  border-radius: 16px;
+}
+
+@media (max-width: 900px) {
+  body.pre-registration .main-wrapper {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  body.pre-registration .left-panel {
+    min-height: auto;
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  body.pre-registration .right-panel {
+    min-height: auto;
+    width: 100%;
+  }
+
+  body.pre-registration .form-container {
+    width: 100%;
+    padding: 30px;
+  }
+}
+
+@media (max-width: 640px) {
+  body.pre-registration {
+    padding: 24px 12px;
+  }
+
+  body.pre-registration .left-panel {
+    padding: 28px;
+  }
+
+  body.pre-registration .form-container {
+    padding: 26px 22px;
+  }
+
+  body.pre-registration .resume-actions-row,
+  .resume-inline {
+    grid-template-columns: 1fr;
+  }
+
+  body.pre-registration #resume-card h3 {
+    font-size: 40px;
+  }
+}
+
+
+
+/* ===== Logo SHIP en pantalla inicial ===== */
+body.pre-registration .resume-card-logo {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0 0 22px;
+}
+
+body.pre-registration .resume-card-logo img {
+  display: block;
+  width: 136px;
+  height: auto;
+  filter: drop-shadow(0 12px 20px rgba(248, 0, 32, .22));
+}
+
+body.pre-registration .resume-kicker {
+  margin-bottom: 16px;
+}
+
+body.pre-registration #resume-card h3 {
+  margin-top: 0;
+}
+
+@media (max-width: 640px) {
+  body.pre-registration .resume-card-logo {
+    margin-bottom: 18px;
+  }
+
+  body.pre-registration .resume-card-logo img {
+    width: 112px;
+  }
+}

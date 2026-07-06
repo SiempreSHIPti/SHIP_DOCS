@@ -1,3 +1,21 @@
+# Fix logo SHIP pantalla inicial
+
+Se agregó el logo SHIP dentro del card inicial, manteniendo el patrón visual actual. Ver `README-FIX-LOGO-SHIP-PANTALLA-INICIAL.md`.
+
+---
+
+# Fix pantalla inicial patrón formulario
+
+Se ajustó la pantalla inicial para usar el mismo patrón visual del formulario: dos columnas, marca en panel izquierdo y acción principal en panel derecho. Ver `README-FIX-PANTALLA-INICIAL-PATRON-FORMULARIO.md`.
+
+---
+
+# Fix marca SHIP en card inicial
+
+Se regresó al diseño anterior y se agregó únicamente la marca SHIP dentro del card inicial. Ver `README-FIX-MARCA-SHIP-CARD-INICIAL.md`.
+
+---
+
 # Fix visual archivos recuperados
 
 Se corrigió la vista de archivos recuperados para que no se vea “Sin archivos seleccionados” cuando el backend ya tiene un documento cargado. Ver `README-FIX-INPUT-ARCHIVOS-RECUPERADOS.md`.
