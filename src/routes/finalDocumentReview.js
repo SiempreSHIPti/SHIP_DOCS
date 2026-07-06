@@ -67,7 +67,11 @@ function isFinalizeFromPartials(body) {
 function buildFinalResultsFromStoredValidation(body, storedValidation = {}) {
   return FILE_FIELDS.map((fieldName) => {
     const existing = storedValidation[fieldName];
-    if (existing) return existing;
+    if (existing) {
+      return shouldOmitDocumentFromSummary(fieldName, body, existing) ? null : existing;
+    }
+
+    if (shouldOmitDocumentFromSummary(fieldName, body, null)) return null;
 
     const required = isFileRequired(fieldName, body);
     if (!required) {
@@ -82,7 +86,7 @@ function buildFinalResultsFromStoredValidation(body, storedValidation = {}) {
     }
 
     return buildMissingResult(fieldName);
-  });
+  }).filter(Boolean);
 }
 
 
@@ -137,6 +141,28 @@ function normalizeVacancyType(value) {
 
 function isVehicleField(fieldName) {
   return ["licencia", "tarjeta", "poliza"].includes(fieldName);
+}
+
+function shouldOmitDocumentFromSummary(fieldName, body, row = null) {
+  const vacancyType = normalizeVacancyType(body?.tipo_vacante || body?.tipoVacante || body?.vacante || "driver");
+
+  if (!isVehicleField(fieldName)) return false;
+
+  // Ayudante no requiere paso vehicular; no se muestran esos documentos en el resumen.
+  if (vacancyType === "ayudante") return true;
+
+  // Chofer sólo requiere licencia; tarjeta y póliza se omiten si no fueron cargadas.
+  if (vacancyType === "chofer" && (fieldName === "tarjeta" || fieldName === "poliza")) {
+    const hasUploadedFile = !!(row?.fileName || row?.validatedAt);
+    const status = String(row?.status || "").toLowerCase();
+    return !hasUploadedFile || status === "skipped" || status === "missing";
+  }
+
+  return false;
+}
+
+function filterResultsForSummary(results = [], body = {}) {
+  return (results || []).filter((row) => !shouldOmitDocumentFromSummary(row?.fieldName, body, row));
 }
 
 function isFileRequired(fieldName, body) {
@@ -600,7 +626,7 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
 
   const fieldsToValidate = partialReview ? FILE_FIELDS.filter((fieldName) => partialFields.has(fieldName)) : FILE_FIELDS;
 
-  const results = await Promise.all(
+  const rawResults = await Promise.all(
     fieldsToValidate.map((fieldName) =>
       limiter(async () => {
         const required = isFileRequired(fieldName, body);
@@ -654,6 +680,7 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
     )
   );
 
+  const results = filterResultsForSummary(rawResults, body);
   const summary = summarize(results);
   const detectedCurp = getCurpFromReview({ results });
 

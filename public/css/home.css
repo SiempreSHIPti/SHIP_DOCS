@@ -725,3 +725,48 @@ body.pre-registration #resume-card h3 {
 .file-status.is-selected small {
   color: rgba(255,255,255,.66);
 }
+
+
+
+/* ===== Omitir pasos no aplicables por tipo de vacante ===== */
+body.skip-vehicle-step .section.step[data-step="3"],
+.section.step.step-not-applicable {
+  display: none !important;
+}
+
+.progress-bar.skip-vehicle-step > :nth-child(4),
+.progress-bar.skip-vehicle-step > :nth-child(5) {
+  display: none !important;
+}
+
+.progress-step.not-applicable {
+  opacity: .45;
+}
+
+.progress-step.not-applicable span::after {
+  content: " no aplica";
+  color: rgba(255,255,255,.45);
+  font-size: 10px;
+  margin-left: 4px;
+  font-weight: 900;
+}
+
+
+
+/* ===== Ocultar campos no obligatorios por vacante ===== */
+.field-not-applicable {
+  display: none !important;
+}
+
+body.skip-vehicle-step .progress-bar > :nth-child(4),
+body.skip-vehicle-step .progress-bar > :nth-child(5),
+body.skip-vehicle-step .progress-bar > :nth-child(6),
+.progress-bar.skip-vehicle-step > :nth-child(4),
+.progress-bar.skip-vehicle-step > :nth-child(5),
+.progress-bar.skip-vehicle-step > :nth-child(6) {
+  display: none !important;
+}
+
+body.skip-vehicle-step .progress-step[data-step="3"] {
+  display: none !important;
+}

@@ -1091,6 +1091,61 @@
       return normalizeVacancyValue(document.getElementById("tipo_vacante")?.value || "");
     }
 
+    function isVehicleStepRequired() {
+      return selectedVacancy() !== "ayudante";
+    }
+
+    function isFieldVisibleInSummary(row = {}) {
+      const fieldName = row.fieldName;
+      const vacancy = selectedVacancy() || "driver";
+
+      if (!["licencia", "tarjeta", "poliza"].includes(fieldName)) return true;
+      if (vacancy === "ayudante") return false;
+      if (vacancy === "chofer" && (fieldName === "tarjeta" || fieldName === "poliza")) {
+        const status = statusForRow(row);
+        const hasUploadedFile = !!(row.fileName || row.validatedAt);
+        return hasUploadedFile && status !== "skipped" && status !== "missing";
+      }
+      return true;
+    }
+
+    function visibleReviewRows(rows = []) {
+      return (rows || []).filter(isFieldVisibleInSummary);
+    }
+
+    function summarizeRowsForUi(rows = []) {
+      const visible = visibleReviewRows(rows);
+      const warnings = visible.filter((x) => x.status === "warning" || x.severity === "warning").length;
+      const approved = visible.filter((x) => x.ok === true && x.status !== "skipped" && x.status !== "warning" && x.severity !== "warning").length;
+      const skipped = visible.filter((x) => x.status === "skipped").length;
+      const rejected = visible.filter((x) => x.ok === false && x.status === "rejected").length;
+      const missing = visible.filter((x) => x.status === "missing").length;
+      const pendingFix = rejected + missing;
+      return {
+        total: visible.length,
+        approved,
+        warnings,
+        skipped,
+        rejected,
+        missing,
+        pendingFix,
+        canContinue: pendingFix === 0,
+      };
+    }
+
+    function updateVacancyStepVisibility() {
+      const skipVehicle = selectedVacancy() === "ayudante";
+      document.body.classList.toggle("skip-vehicle-step", skipVehicle);
+      document.querySelector(".progress-bar")?.classList.toggle("skip-vehicle-step", skipVehicle);
+      document.querySelector('.section.step[data-step="3"]')?.classList.toggle("step-not-applicable", skipVehicle);
+      if (skipVehicle) {
+        stepValidationOk[3] = false;
+        stepValidationPending[3] = false;
+        delete stepValidationPromises[3];
+      }
+      updateProgress(currentStepNumber());
+    }
+
     function setRequiredMark(inputId, required) {
       const input = document.getElementById(inputId);
       const label = document.querySelector(`label[for="${CSS.escape(inputId)}"]`);
@@ -1124,11 +1179,44 @@
       if (vacancy === "driver") {
         notice.textContent = "Vacante Driver: licencia, tarjeta de circulación y póliza son obligatorias.";
       } else if (vacancy === "chofer") {
-        notice.textContent = "Vacante Chofer: licencia obligatoria; tarjeta de circulación y póliza son opcionales.";
+        notice.textContent = "Vacante Chofer: sólo se solicitará licencia de conducir.";
       } else if (vacancy === "ayudante") {
-        notice.textContent = "Vacante Ayudante: el paso vehicular es opcional. Puedes continuar sin cargar documentos de vehículo.";
+        notice.textContent = "Vacante Ayudante: el paso vehicular no aplica.";
       } else {
         notice.textContent = "Selecciona el tipo de vacante para aplicar las reglas documentales.";
+      }
+    }
+
+    function fieldContainer(inputId) {
+      const input = document.getElementById(inputId);
+      return input?.closest(".col-6, .col-12, .field-group") || null;
+    }
+
+    function clearFileInput(input) {
+      if (!input) return;
+      try { input.value = ""; } catch (_) {}
+      clearRecoveredFileControl(input);
+      const status = input.parentElement?.querySelector(".file-status");
+      if (status) status.remove();
+      delete partialValidationByField[input.name];
+      fieldsPendingTargetedRevalidation.delete(input.name);
+      delete input.dataset.targetedRevalidate;
+    }
+
+    function setFieldVisibility(inputId, visible) {
+      const input = document.getElementById(inputId);
+      const container = fieldContainer(inputId);
+      if (container) {
+        container.classList.toggle("field-not-applicable", !visible);
+        container.style.display = visible ? "" : "none";
+      }
+
+      if (input) {
+        input.disabled = !visible;
+        if (!visible) {
+          input.required = false;
+          clearFileInput(input);
+        }
       }
     }
 
@@ -1137,13 +1225,18 @@
       const vacancyInput = document.getElementById("tipo_vacante");
       if (vacancyInput) vacancyInput.value = vacancy;
 
-      const licenciaRequired = vacancy === "driver" || vacancy === "chofer";
-      const tarjetaRequired = vacancy === "driver";
-      const polizaRequired = vacancy === "driver";
+      const showLicencia = vacancy === "driver" || vacancy === "chofer";
+      const showTarjeta = vacancy === "driver";
+      const showPoliza = vacancy === "driver";
 
-      setRequiredMark("licencia", licenciaRequired);
-      setRequiredMark("tarjeta", tarjetaRequired);
-      setRequiredMark("poliza", polizaRequired);
+      setFieldVisibility("licencia", showLicencia);
+      setFieldVisibility("tarjeta", showTarjeta);
+      setFieldVisibility("poliza", showPoliza);
+
+      setRequiredMark("licencia", showLicencia);
+      setRequiredMark("tarjeta", showTarjeta);
+      setRequiredMark("poliza", showPoliza);
+
       updateVehicleHelpText(vacancy);
 
       document.querySelectorAll("[data-vacancy]").forEach((btn) => {
@@ -1156,6 +1249,7 @@
       }
 
       invalidateStep(3);
+      updateVacancyStepVisibility();
       return vacancy;
     }
 
@@ -1236,6 +1330,7 @@
 
     async function waitForPendingSectionValidations() {
       const pending = [1, 2, 3]
+        .filter((step) => !(step === 3 && !isVehicleStepRequired()))
         .filter((step) => stepValidationPending[step] && stepValidationPromises[step])
         .map((step) => stepValidationPromises[step]);
 
@@ -1249,7 +1344,7 @@
     }
 
     function failedLabelsFromPayload(payload) {
-      return (payload?.results || [])
+      return visibleReviewRows(payload?.results || [])
         .filter((row) => {
           const status = statusForRow(row);
           return status === "rejected" || status === "missing";
@@ -1263,7 +1358,7 @@
     }
 
     function failedFieldsFromPayload(payload) {
-      return (payload?.results || [])
+      return visibleReviewRows(payload?.results || [])
         .filter(statusIsBlocking)
         .map((row) => row.fieldName)
         .filter(Boolean);
@@ -1280,6 +1375,7 @@
     }
 
     function targetedFieldsForStep(step) {
+      if (Number(step) === 3 && !isVehicleStepRequired()) return [];
       const fields = STEP_FILE_FIELDS[Number(step)] || [];
       return Array.from(fieldsPendingTargetedRevalidation).filter((field) => fields.includes(field));
     }
@@ -1287,6 +1383,11 @@
     function syncStepChecksFromPayload(payload) {
       const rows = payload?.results || [];
       for (const step of [1, 2, 3]) {
+        if (step === 3 && !isVehicleStepRequired()) {
+          stepValidationOk[3] = false;
+          stepValidationPending[3] = false;
+          continue;
+        }
         const fields = STEP_FILE_FIELDS[step] || [];
         const rowsForStep = rows.filter((row) => fields.includes(row.fieldName));
         if (!rowsForStep.length) {
@@ -1762,8 +1863,8 @@
       const screen = document.getElementById("ai-review-screen");
       const list = document.getElementById("review-list");
       const alert = document.getElementById("review-alert");
-      const summary = payload.summary || {};
-      const rows = payload.results || [];
+      const rows = visibleReviewRows(payload.results || []);
+      const summary = summarizeRowsForUi(rows);
 
       document.getElementById("review-score-number").textContent = `${summary.approved || 0}/${Math.max((summary.total || rows.length) - (summary.skipped || 0), 0)}`;
       document.getElementById("stat-approved").textContent = summary.approved || 0;
@@ -2241,7 +2342,10 @@
         stepEl.classList.remove("active", "completed", "validating");
         const dot = stepEl.querySelector(".progress-dot");
 
-        if (stepValidationOk[stepNum]) {
+        if (stepNum === 3 && !isVehicleStepRequired()) {
+          stepEl.classList.add("not-applicable");
+          if (dot) dot.innerHTML = "—";
+        } else if (stepValidationOk[stepNum]) {
           stepEl.classList.add("completed");
           if (dot) dot.innerHTML = "✓";
         } else if (stepValidationPending[stepNum]) {
@@ -2257,6 +2361,7 @@
     }
 
     function showStep(n) {
+      if (Number(n) === 3 && !isVehicleStepRequired()) n = 4;
       document.querySelectorAll(".step").forEach((s) => {
         s.classList.toggle("active", Number(s.dataset.step) === Number(n));
       });
@@ -2495,18 +2600,18 @@
     document.getElementById("next-2")?.addEventListener("click", () => {
       if (!validateStep2()) return;
       startSectionValidation(2, targetedFieldsForStep(2));
-      showStep(3);
+      showStep(isVehicleStepRequired() ? 3 : 4);
     });
 
     document.getElementById("next-3")?.addEventListener("click", () => {
       if (!validateStep3()) return;
-      startSectionValidation(3, targetedFieldsForStep(3));
+      if (isVehicleStepRequired()) startSectionValidation(3, targetedFieldsForStep(3));
       showStep(4);
     });
 
     document.getElementById("back-2")?.addEventListener("click", () => showStep(1));
     document.getElementById("back-3")?.addEventListener("click", () => showStep(2));
-    document.getElementById("back-4")?.addEventListener("click", () => showStep(3));
+    document.getElementById("back-4")?.addEventListener("click", () => showStep(isVehicleStepRequired() ? 3 : 2));
 
     document.getElementById("document-form")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();

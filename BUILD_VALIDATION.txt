@@ -64,16 +64,14 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "submit_sends_to_summary": true,
-  "save_draft_in_summary_kept": true,
-  "targeted_state": true,
-  "targeted_revalidate_function": true,
-  "review_button_targeted": true,
-  "partial_fields_override": true,
-  "replace_marks_targeted": true,
-  "file_change_not_full_step_for_targeted": true,
-  "targeted_next_step_override": true,
-  "finalize_silent": true,
-  "vacancy_rules_kept": true,
-  "css_targeted": true
+  "field_visibility_helper": true,
+  "driver_shows_all_vehicle": true,
+  "hidden_fields_disabled_cleared": true,
+  "chofer_copy_only_licencia": true,
+  "ayudante_copy_no_vehicle": true,
+  "css_hides_field_not_applicable": true,
+  "css_hides_vehicle_step_progress": true,
+  "ayudante_skips_vehicle_logic": true,
+  "summary_omits_backend": true,
+  "targeted_revalidation_kept": true
 }

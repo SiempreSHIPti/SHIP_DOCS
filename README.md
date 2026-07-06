@@ -1,3 +1,15 @@
+# Fix ocultar campos no obligatorios
+
+Se ocultan por completo los campos que no son obligatorios según la vacante y se oculta el paso Vehículo para Ayudante. Ver `README-FIX-OCULTAR-CAMPOS-NO-OBLIGATORIOS.md`.
+
+---
+
+# Fix omitir pasos no aplicables
+
+Se ajustó el flujo para saltar pasos y omitir documentos no aplicables según el tipo de vacante. Ver `README-FIX-OMITIR-PASOS-NO-APLICABLES.md`.
+
+---
+
 # Fix resumen y revalidación dirigida
 
 Se ajustó el flujo para llegar al resumen, permitir guardar avance y revalidar sólo archivos corregidos. Ver `README-FIX-RESUMEN-Y-REVALIDACION-DIRIGIDA.md`.
