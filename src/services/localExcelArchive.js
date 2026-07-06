@@ -154,6 +154,98 @@ function firstNonEmpty(...values) {
   return "";
 }
 
+
+function reviewText(...values) {
+  return values
+    .flat(Infinity)
+    .filter(Boolean)
+    .map((v) => typeof v === "object" ? JSON.stringify(v) : String(v))
+    .join(" ");
+}
+
+function normalizeBankName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase()
+    .slice(0, 80);
+}
+
+function extractClabeFromText(value) {
+  const text = String(value || "");
+  if (!text.trim()) return "";
+
+  const contextual = text.match(/(?:CLABE|CLABE INTERBANCARIA|CUENTA CLABE|INTERBANCARIA)[^\d]*(\d[\d\s-]{16,34}\d)/i);
+  if (contextual?.[1]) {
+    const digits = contextual[1].replace(/\D/g, "");
+    if (digits.length >= 18) return digits.slice(0, 18);
+  }
+
+  const contiguous = text.match(/\b\d{18}\b/);
+  if (contiguous?.[0]) return contiguous[0];
+
+  const compact = text.replace(/[^\d]/g, "");
+  const mostlyDigits = text.replace(/[\d\s-]/g, "").trim().length <= 3;
+  if (mostlyDigits && compact.length >= 18) return compact.slice(0, 18);
+
+  return "";
+}
+
+function getEstadoCuentaRow(reviewPayload = {}) {
+  const rows = reviewPayload?.results || [];
+  return rows.find((row) => row?.fieldName === "estado_cuenta") || null;
+}
+
+function extractBankFromReview(reviewPayload = {}) {
+  const row = getEstadoCuentaRow(reviewPayload);
+  const fields = row?.fields || {};
+  return normalizeBankName(
+    fields.banco ||
+    fields.bank ||
+    fields.institucion ||
+    fields.institucion_bancaria ||
+    fields.entidad_financiera ||
+    fields.emisor ||
+    fields.banco_emisor ||
+    ""
+  );
+}
+
+function extractClabeFromReview(reviewPayload = {}) {
+  const row = getEstadoCuentaRow(reviewPayload);
+  const fields = row?.fields || {};
+  const direct = [
+    fields.clabe,
+    fields.clabe_interbancaria,
+    fields.clabeInterbancaria,
+    fields.cuenta_clabe,
+    fields.cuentaClabe,
+    fields.clabe_o_cuenta,
+    fields.cuenta,
+    fields.numero_cuenta,
+    fields.account,
+  ];
+
+  for (const candidate of direct) {
+    const clabe = extractClabeFromText(candidate);
+    if (clabe) return clabe;
+  }
+
+  return extractClabeFromText(reviewText(
+    row?.summary,
+    row?.nameFound,
+    row?.documentTypeDetected,
+    row?.fields,
+    row?.issues,
+    row?.warnings
+  ));
+}
+
+
 function normalizeCurp(value) {
   const text = String(value || "").toUpperCase();
   const match = text.match(/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/);
@@ -184,6 +276,8 @@ function normalizeBody(body = {}, reviewPayload = {}) {
   const curpRow = findReviewRow(reviewPayload, "curp");
   const nssRow = findReviewRow(reviewPayload, "nss_file");
   const constanciaRow = findReviewRow(reviewPayload, "constancia");
+  const bankFromReview = extractBankFromReview(reviewPayload);
+  const clabeFromReview = extractClabeFromReview(reviewPayload);
 
   const curpFromReview = firstNonEmpty(
     curpRow?.fields?.curp,
@@ -210,9 +304,9 @@ function normalizeBody(body = {}, reviewPayload = {}) {
     nombre: get("nombre").toUpperCase(),
     telefono: get("telefono").replace(/\D/g, "").slice(0, 10),
     direccion: get("direccion"),
-    banco: get("banco").toUpperCase(),
+    banco: normalizeBankName(firstNonEmpty(get("banco"), bankFromReview)),
     clabeMode: get("clabe_mode") || "archivo",
-    clabeTxt: get("clabe", "clabeTxt").replace(/\D/g, "").slice(0, 18),
+    clabeTxt: extractClabeFromText(firstNonEmpty(get("clabe", "clabeTxt"), clabeFromReview)),
     nssMode: get("nss_mode"),
     nssNum: normalizeNss(firstNonEmpty(get("nss_num", "nssNum"), nssFromReview)),
     rfc: normalizeRfc(firstNonEmpty(get("rfc"), rfcFromReview)),

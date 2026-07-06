@@ -260,6 +260,8 @@ Analiza visualmente/OCR el documento y responde SOLO JSON válido con esta estru
   "fields": {
     "banco": string|null,
     "clabe": string|null,
+    "clabe_interbancaria": string|null,
+    "cuenta_clabe": string|null,
     "cuenta": string|null,
     "curp": string|null,
     "rfc": string|null,
@@ -278,7 +280,9 @@ Analiza visualmente/OCR el documento y responde SOLO JSON válido con esta estru
 Reglas:
 - ok debe ser true sólo si el documento corresponde al tipo esperado, es legible y cumple la coincidencia de nombre cuando aplique.
 - La coincidencia de nombre debe evaluarse ignorando acentos/diacríticos y diferencias menores de mayúsculas/minúsculas. Ejemplo: JOSE = JOSÉ, MARTIN = MARTÍN, GONZALEZ = GONZÁLEZ.
-- Si es estado de cuenta, valida que parezca emitido por banco, tenga titular y CLABE/cuenta visible.
+- Si es estado de cuenta, extrae SIEMPRE que sea visible el banco emisor y la CLABE interbancaria de 18 dígitos.
+- Para estado de cuenta, guarda banco en fields.banco y la CLABE en fields.clabe. Si aparece separada con espacios o guiones, devuélvela sólo con 18 dígitos.
+- Si no encuentras CLABE de 18 dígitos pero hay número de cuenta, colócalo en fields.cuenta.
 - Si falta el titular, CLABE/cuenta o no es legible, recommendation debe ser reject o manual_review.
 - Si el documento esperado es Comprobante de domicilio, valida únicamente que sea un comprobante real/válido, legible y que contenga domicilio/emisor/periodo o datos suficientes. No lo rechaces si está a nombre de otra persona.
 - Si el documento esperado es Tarjeta de circulación o Póliza de seguro, valida que el documento sea real/válido aunque no esté a nombre del driver.

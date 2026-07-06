@@ -55,6 +55,98 @@ const SHEETS_HEADERS = [
   "Resumen revisión IA JSON",
 ];
 
+
+function reviewText(...values) {
+  return values
+    .flat(Infinity)
+    .filter(Boolean)
+    .map((v) => typeof v === "object" ? JSON.stringify(v) : String(v))
+    .join(" ");
+}
+
+function normalizeBankName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase()
+    .slice(0, 80);
+}
+
+function extractClabeFromText(value) {
+  const text = String(value || "");
+  if (!text.trim()) return "";
+
+  const contextual = text.match(/(?:CLABE|CLABE INTERBANCARIA|CUENTA CLABE|INTERBANCARIA)[^\d]*(\d[\d\s-]{16,34}\d)/i);
+  if (contextual?.[1]) {
+    const digits = contextual[1].replace(/\D/g, "");
+    if (digits.length >= 18) return digits.slice(0, 18);
+  }
+
+  const contiguous = text.match(/\b\d{18}\b/);
+  if (contiguous?.[0]) return contiguous[0];
+
+  const compact = text.replace(/[^\d]/g, "");
+  const mostlyDigits = text.replace(/[\d\s-]/g, "").trim().length <= 3;
+  if (mostlyDigits && compact.length >= 18) return compact.slice(0, 18);
+
+  return "";
+}
+
+function getEstadoCuentaRow(reviewPayload = {}) {
+  const rows = reviewPayload?.results || [];
+  return rows.find((row) => row?.fieldName === "estado_cuenta") || null;
+}
+
+function extractBankFromReview(reviewPayload = {}) {
+  const row = getEstadoCuentaRow(reviewPayload);
+  const fields = row?.fields || {};
+  return normalizeBankName(
+    fields.banco ||
+    fields.bank ||
+    fields.institucion ||
+    fields.institucion_bancaria ||
+    fields.entidad_financiera ||
+    fields.emisor ||
+    fields.banco_emisor ||
+    ""
+  );
+}
+
+function extractClabeFromReview(reviewPayload = {}) {
+  const row = getEstadoCuentaRow(reviewPayload);
+  const fields = row?.fields || {};
+  const direct = [
+    fields.clabe,
+    fields.clabe_interbancaria,
+    fields.clabeInterbancaria,
+    fields.cuenta_clabe,
+    fields.cuentaClabe,
+    fields.clabe_o_cuenta,
+    fields.cuenta,
+    fields.numero_cuenta,
+    fields.account,
+  ];
+
+  for (const candidate of direct) {
+    const clabe = extractClabeFromText(candidate);
+    if (clabe) return clabe;
+  }
+
+  return extractClabeFromText(reviewText(
+    row?.summary,
+    row?.nameFound,
+    row?.documentTypeDetected,
+    row?.fields,
+    row?.issues,
+    row?.warnings
+  ));
+}
+
+
 function isEnabled() {
   return ENV.GOOGLE_ARCHIVE_ENABLED === true || ENV.GOOGLE_ARCHIVE_ENABLED === "true";
 }
@@ -233,6 +325,10 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
   const summary = reviewPayload?.summary || {};
   const fileLink = (fieldName) => googleFiles[fieldName]?.webViewLink || "";
   const status = rowStatus || (summary.canContinue ? (summary.warnings ? "APROBADO_CON_OBSERVACIONES" : "APROBADO") : "CON_ERRORES");
+  const bankFromReview = extractBankFromReview(reviewPayload);
+  const clabeFromReview = extractClabeFromReview(reviewPayload);
+  const banco = normalizeBankName(bodyData.banco || bankFromReview);
+  const clabe = extractClabeFromText(bodyData.clabeTxt || bodyData.clabe || clabeFromReview);
 
   return [
     nowMxIsoLike(),
@@ -241,8 +337,8 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
     bodyData.nombre || "",
     bodyData.telefono || "",
     bodyData.direccion || "",
-    bodyData.banco || "",
-    bodyData.clabeTxt || "",
+    banco,
+    clabe,
     bodyData.nssNum || "",
     bodyData.rfc || "",
     bodyData.curpTxt || localResult.curp || "",

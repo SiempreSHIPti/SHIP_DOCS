@@ -113,12 +113,19 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "draft_returns_data": true,
   "maps_browser_key_supported": true,
-  "driver_no_excel_label": true,
-  "driver_no_credential_label": true,
-  "driver_no_row_number": true,
-  "driver_no_credential_id": true,
-  "driver_success_simple": true,
-  "draft_success_simple": true
+  "maps_autocomplete_present": true,
+  "maps_requires_selected_place": true,
+  "bank_clabe_doc_prompt": true,
+  "local_excel_extracts_bank": true,
+  "local_excel_extracts_clabe": true,
+  "sheets_extracts_bank_clabe": true,
+  "draft_stores_bank_clabe": true,
+  "continue_clears_state": true,
+  "load_draft_resets_first": true,
+  "load_draft_goes_summary": true,
+  "file_recovered_status": true,
+  "final_hides_excel_credential": true,
+  "finish_button_simple": true,
+  "reset_after_final_success": true
 }

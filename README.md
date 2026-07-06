@@ -1,3 +1,9 @@
+# Fix Maps, banco/CLABE, continuar y limpieza
+
+Se corrigió autocompletado con Google Maps, extracción de banco/CLABE desde estado de cuenta, recuperación de avances directa al resumen y limpieza final del formulario. Ver `README-FIX-MAPS-BANCO-CLABE-CONTINUAR-LIMPIEZA.md`.
+
+---
+
 # Fix mensajes driver, draft y Maps
 
 Se corrigió el error al guardar avance, se ocultó información técnica para drivers y se agregó soporte para `GOOGLE_MAPS_BROWSER_KEY`. Ver `README-FIX-MENSAJES-DRIVER-DRAFT-MAPS.md`.

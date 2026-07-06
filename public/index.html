@@ -924,7 +924,7 @@
             <div class="review-actions">
               <button type="button" class="btn-primary-review" id="review-revalidate-btn">Validar nuevamente</button>
               <button type="button" class="btn-secondary-review" id="save-draft-btn">Guardar avance</button>
-              <button type="button" class="btn-secondary-review" id="review-finish-btn">Guardar registro y generar credencial</button>
+              <button type="button" class="btn-secondary-review" id="review-finish-btn">Guardar registro</button>
             </div>
             <div class="draft-toast" id="draft-toast"></div>
             <div class="archive-result" id="archive-result" style="display:none;"></div>
@@ -972,6 +972,7 @@
     const DRAFT_PREFIX = "ship_registration_draft_curp_";
     let latestReviewPayload = null;
     let loadedDraftCurp = "";
+    let appModalAfterClose = null;
     let mapsAutocompleteReady = false;
 
     function showAppModal(title, message, options = {}) {
@@ -1000,13 +1001,17 @@
 
     function closeAppModal() {
       document.getElementById("app-modal")?.classList.remove("active");
+      const action = appModalAfterClose;
+      appModalAfterClose = null;
+      if (typeof action === "function") action();
     }
 
     document.addEventListener("click", (ev) => {
       if (ev.target?.id === "app-modal-close") closeAppModal();
     });
 
-    function showSuccess(title, message) {
+    function showSuccess(title, message, options = {}) {
+      appModalAfterClose = typeof options.afterClose === "function" ? options.afterClose : null;
       showAppModal(title, message, { type: "success" });
     }
 
@@ -1019,8 +1024,8 @@
       if (text.includes("DUPLICATE_CURP") || text.includes("ya tiene un registro final") || text.includes("No se puede registrar de nuevo")) {
         return "Esta CURP ya tiene un registro final. No se puede registrar de nuevo.";
       }
-      if (text.includes("Unable to parse range")) return "No se pudo escribir en Google Sheets. Revisa la pestaña del archivo.";
-      if (text.includes("GEMINI_API_KEY")) return "No se pudo usar la IA. Revisa la API Key.";
+      if (text.includes("Unable to parse range")) return "No pudimos guardar el registro. Intenta de nuevo o avisa al equipo de SHIP.";
+      if (text.includes("GEMINI_API_KEY")) return "No pudimos revisar los documentos. Avisa al equipo de SHIP.";
       return text.length > 180 ? `${text.slice(0, 177)}...` : text;
     }
 
@@ -1038,7 +1043,7 @@
         const input = document.querySelector(`input[type="file"][name="${CSS.escape(fieldName)}"]`);
         if (!input) return;
         const name = info.originalName || info.relativePath || "archivo guardado";
-        setFileStatus(input, "ok", `Documento recuperado`, "Lo usaremos si no subes uno nuevo.");
+        setFileStatus(input, "ok", `Documento recuperado: ${shortFileName(name)}`, "Lo usaremos si no subes uno nuevo.");
       });
     }
 
@@ -1219,7 +1224,7 @@
       }).join("");
 
       document.getElementById("review-finish-btn").disabled = !summary.canContinue;
-      document.getElementById("review-finish-btn").textContent = summary.canContinue ? "Guardar registro y generar credencial" : "Corrige documentos primero";
+      document.getElementById("review-finish-btn").textContent = summary.canContinue ? "Guardar registro" : "Corrige documentos primero";
 
       screen.classList.add("active");
       screen.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1292,7 +1297,7 @@
 
       btn.disabled = true;
       btn.textContent = "Guardando registro…";
-      showAppModal("Guardando registro", "Estamos guardando documentos, credencial, Drive y Sheets.", { type: "loading" });
+      showAppModal("Guardando registro", "Estamos guardando tu información. No cierres esta ventana.", { type: "loading" });
       resultBox.style.display = "none";
       resultBox.innerHTML = "";
 
@@ -1318,8 +1323,11 @@
         toast.textContent = "Registro enviado correctamente.";
         toast.classList.add("active");
 
-        showSuccess("Registro enviado", "Gracias. Tu información fue guardada correctamente.");
+        showSuccess("Registro enviado", "Gracias. Tu información fue guardada correctamente.", {
+          afterClose: resetForNextDriver
+        });
         btn.textContent = "Registro enviado";
+        setTimeout(resetForNextDriver, 3500);
       } catch (err) {
         const msg = friendlyErrorMessage(err, "No fue posible guardar el registro.");
         errEl.textContent = msg;
@@ -1423,6 +1431,7 @@
         return;
       }
 
+      hardResetForm();
       showAppModal("Buscando avance", "Estamos buscando tu registro y archivos guardados.", { type: "loading" });
 
       try {
@@ -1686,6 +1695,17 @@
       document.getElementById("archive-result") && (document.getElementById("archive-result").style.display = "none");
       latestReviewPayload = null;
       loadedDraftCurp = "";
+      for (const id of ["direccion_place_id", "direccion_lat", "direccion_lng"]) {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      }
+      const mapsHelp = document.getElementById("maps-help");
+      if (mapsHelp) {
+        mapsHelp.textContent = mapsAutocompleteReady
+          ? "Busca tu dirección y selecciona una opción de Google Maps."
+          : "Captura tu dirección completa.";
+        mapsHelp.className = "maps-help warn";
+      }
 
       applyClabeMode("archivo");
       applyNssMode("archivo");
@@ -1822,7 +1842,21 @@
     applyNssMode(document.querySelector('input[name="nss_mode"]:checked')?.value || "archivo");
 
 
-    function showRegistrationInterface() {
+    
+    function resetForNextDriver() {
+      hardResetForm();
+      document.body.classList.add("pre-registration");
+      const resumeCard = document.getElementById("resume-card");
+      if (resumeCard) {
+        resumeCard.style.display = "";
+        resumeCard.classList.add("active");
+      }
+      const note = document.getElementById("resume-note");
+      if (note) note.textContent = "";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+function showRegistrationInterface() {
       document.body.classList.remove("pre-registration");
       const resumeCard = document.getElementById("resume-card");
       if (resumeCard) resumeCard.style.display = "none";
@@ -1842,6 +1876,7 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
     });
 
     document.getElementById("show-resume-btn")?.addEventListener("click", () => {
+      hardResetForm();
       document.getElementById("resume-box")?.classList.toggle("active");
       document.getElementById("resume-curp")?.focus();
     });
@@ -1891,7 +1926,14 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
       try {
         const res = await fetch("/api/config");
         const { mapsKey } = await res.json();
-        if (!mapsKey) return;
+        const mapsHelp = document.getElementById("maps-help");
+        if (!mapsKey) {
+          if (mapsHelp) {
+            mapsHelp.textContent = "Google Maps no está configurado. Captura tu dirección completa manualmente.";
+            mapsHelp.className = "maps-help warn";
+          }
+          return;
+        }
         
         const script = document.createElement("script");
         script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=places&loading=async&callback=__gmapsReady`;
@@ -1925,9 +1967,9 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
         };
 
         const autocomplete = new google.maps.places.Autocomplete(direccionInput, {
-          types: ["address"],
+          types: ["geocode"],
           componentRestrictions: { country: "mx" },
-          fields: ["formatted_address", "geometry", "place_id", "name"]
+          fields: ["formatted_address", "geometry", "place_id", "name", "address_components"]
         });
 
         direccionInput.addEventListener("input", () => {
