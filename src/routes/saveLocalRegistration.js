@@ -9,6 +9,11 @@ const { ENV } = require("../config/env");
 
 const router = express.Router();
 
+function useGoogleArchiveAsRegistry() {
+  return ENV.GOOGLE_ARCHIVE_ENABLED === true || ENV.GOOGLE_ARCHIVE_ENABLED === "true";
+}
+
+
 const uploadFields = upload.fields(FILE_FIELDS.map((name) => ({ name, maxCount: 1 })));
 
 function hasBoundary(req) {
@@ -57,18 +62,20 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
   try {
     const curpDetected = getCurpFromReview(finalReview);
     if (curpDetected) {
-      const localDuplicate = await findCompletedRegistration(curpDetected);
-      if (localDuplicate) {
-        return res.status(409).json({
-          ok: false,
-          duplicateRegistered: true,
-          code: "DUPLICATE_CURP",
-          error: `La CURP ${curpDetected} ya tiene un registro final. No se puede registrar de nuevo.`,
-          duplicate: localDuplicate,
-        });
+      if (!useGoogleArchiveAsRegistry()) {
+        const localDuplicate = await findCompletedRegistration(curpDetected);
+        if (localDuplicate) {
+          return res.status(409).json({
+            ok: false,
+            duplicateRegistered: true,
+            code: "DUPLICATE_CURP",
+            error: `La CURP ${curpDetected} ya tiene un registro final. No se puede registrar de nuevo.`,
+            duplicate: localDuplicate,
+          });
+        }
       }
 
-      if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+      if (useGoogleArchiveAsRegistry()) {
         await assertNoDuplicateFinalRegistration(curpDetected);
       }
     }

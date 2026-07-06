@@ -1,3 +1,9 @@
+# Fix duplicados Sheets source
+
+Se corrigió la validación de duplicados para que en producción use Google Sheets como fuente de verdad y no el archivo local temporal del contenedor. Ver `README-FIX-DUPLICADOS-SHEETS-SOURCE.md`.
+
+---
+
 # Fix Maps, banco/CLABE, continuar y limpieza
 
 Se corrigió autocompletado con Google Maps, extracción de banco/CLABE desde estado de cuenta, recuperación de avances directa al resumen y limpieza final del formulario. Ver `README-FIX-MAPS-BANCO-CLABE-CONTINUAR-LIMPIEZA.md`.

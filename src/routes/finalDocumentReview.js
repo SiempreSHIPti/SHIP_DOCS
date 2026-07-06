@@ -10,6 +10,11 @@ const { findFinalRegistrationByCurp } = require("../services/googleArchive");
 
 const router = express.Router();
 
+function useGoogleArchiveAsRegistry() {
+  return ENV.GOOGLE_ARCHIVE_ENABLED === true || ENV.GOOGLE_ARCHIVE_ENABLED === "true";
+}
+
+
 const FILE_FIELDS = [
   "selfie",
   "estado_cuenta",
@@ -503,18 +508,20 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
   const detectedCurp = getCurpFromReview({ results });
 
   if (detectedCurp) {
-    const localDuplicate = await findCompletedRegistration(detectedCurp);
-    if (localDuplicate) {
-      return res.status(409).json({
-        ok: false,
-        duplicateRegistered: true,
-        code: "DUPLICATE_CURP",
-        error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
-        duplicate: localDuplicate,
-      });
+    if (!useGoogleArchiveAsRegistry()) {
+      const localDuplicate = await findCompletedRegistration(detectedCurp);
+      if (localDuplicate) {
+        return res.status(409).json({
+          ok: false,
+          duplicateRegistered: true,
+          code: "DUPLICATE_CURP",
+          error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
+          duplicate: localDuplicate,
+        });
+      }
     }
 
-    if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+    if (useGoogleArchiveAsRegistry()) {
       const googleDuplicate = await findFinalRegistrationByCurp(detectedCurp);
       if (googleDuplicate) {
         return res.status(409).json({

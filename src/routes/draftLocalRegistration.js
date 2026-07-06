@@ -15,6 +15,11 @@ const { archiveDraftToGoogle, findFinalRegistrationByCurp } = require("../servic
 
 const router = express.Router();
 
+function useGoogleArchiveAsRegistry() {
+  return ENV.GOOGLE_ARCHIVE_ENABLED === true || ENV.GOOGLE_ARCHIVE_ENABLED === "true";
+}
+
+
 const uploadFields = upload.fields(FILE_FIELDS.map((name) => ({ name, maxCount: 1 })));
 
 function hasBoundary(req) {
@@ -54,18 +59,20 @@ router.post("/api/registration/save-draft-local", processUploadMiddleware, async
   try {
     const curpDetected = getCurpFromReview(finalReview);
     if (curpDetected) {
-      const localDuplicate = await findCompletedRegistration(curpDetected);
-      if (localDuplicate) {
-        return res.status(409).json({
-          ok: false,
-          duplicateRegistered: true,
-          code: "DUPLICATE_CURP",
-          error: `La CURP ${curpDetected} ya tiene un registro final. No se puede registrar de nuevo.`,
-          duplicate: localDuplicate,
-        });
+      if (!useGoogleArchiveAsRegistry()) {
+        const localDuplicate = await findCompletedRegistration(curpDetected);
+        if (localDuplicate) {
+          return res.status(409).json({
+            ok: false,
+            duplicateRegistered: true,
+            code: "DUPLICATE_CURP",
+            error: `La CURP ${curpDetected} ya tiene un registro final. No se puede registrar de nuevo.`,
+            duplicate: localDuplicate,
+          });
+        }
       }
 
-      if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+      if (useGoogleArchiveAsRegistry()) {
         const googleDuplicate = await findFinalRegistrationByCurp(curpDetected);
         if (googleDuplicate) {
           return res.status(409).json({
@@ -87,7 +94,7 @@ router.post("/api/registration/save-draft-local", processUploadMiddleware, async
     });
 
     let googleDraft = null;
-    if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+    if (useGoogleArchiveAsRegistry()) {
       googleDraft = await archiveDraftToGoogle({
         draftResult: result,
         bodyData: result.data,
@@ -124,18 +131,20 @@ router.get("/api/registration/draft-local/:curp", async (req, res) => {
     return res.status(400).json({ ok: false, error: "CURP inválida." });
   }
 
-  const localDuplicate = await findCompletedRegistration(curp);
-  if (localDuplicate) {
-    return res.status(409).json({
-      ok: false,
-      duplicateRegistered: true,
-      code: "DUPLICATE_CURP",
-      error: `La CURP ${curp} ya tiene un registro final. No se puede registrar de nuevo.`,
-      duplicate: localDuplicate,
-    });
+  if (!useGoogleArchiveAsRegistry()) {
+    const localDuplicate = await findCompletedRegistration(curp);
+    if (localDuplicate) {
+      return res.status(409).json({
+        ok: false,
+        duplicateRegistered: true,
+        code: "DUPLICATE_CURP",
+        error: `La CURP ${curp} ya tiene un registro final. No se puede registrar de nuevo.`,
+        duplicate: localDuplicate,
+      });
+    }
   }
 
-  if (ENV.GOOGLE_ARCHIVE_ENABLED) {
+  if (useGoogleArchiveAsRegistry()) {
     const googleDuplicate = await findFinalRegistrationByCurp(curp);
     if (googleDuplicate) {
       return res.status(409).json({
