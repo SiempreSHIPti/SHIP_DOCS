@@ -1,3 +1,9 @@
+# Fix sin borrador final, un registro y compresión
+
+Se corrigió el flujo para que al guardar final se actualice la fila BORRADOR en Sheets, se elimine el borrador local, se renombren documentos por columna y se compriman imágenes antes de subir a Drive. Ver `README-FIX-SIN-BORRADOR-UN-REGISTRO-COMPRESION.md`.
+
+---
+
 # Fix duplicados Sheets source
 
 Se corrigió la validación de duplicados para que en producción use Google Sheets como fuente de verdad y no el archivo local temporal del contenedor. Ver `README-FIX-DUPLICADOS-SHEETS-SOURCE.md`.

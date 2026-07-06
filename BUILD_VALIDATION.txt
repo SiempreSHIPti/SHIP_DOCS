@@ -1,6 +1,125 @@
+$ node --check index.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/config/env.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/server.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/routes/submit.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/routes/jobStatus.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/routes/documentValidationRealtime.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/routes/finalDocumentReview.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/routes/saveLocalRegistration.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/routes/draftLocalRegistration.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/services/localExcelArchive.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/services/localDraftStore.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/services/googleArchive.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/services/processSubmission.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/services/documentValidation.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/middleware/upload.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/middleware/security.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+
 TEXT_CHECKS:
 {
-  "final_local_duplicate_guarded": true,
-  "save_local_duplicate_guarded": true,
-  "draft_local_duplicate_guarded": true
+  "sharp_dependency": true,
+  "image_compression": true,
+  "documents_named_by_column": true,
+  "replace_existing_drive_file": true,
+  "draft_sheet_upsert": true,
+  "final_updates_draft_row": true,
+  "delete_extra_draft_rows": true,
+  "trash_manifest_final": true,
+  "delete_local_draft": true
 }

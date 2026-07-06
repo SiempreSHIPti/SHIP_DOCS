@@ -372,6 +372,22 @@ async function mergeDraftFilesWithUploads({ files, curp }) {
   return merged;
 }
 
+
+async function deleteLocalDraft(curpRaw) {
+  const curp = normalizeCurp(curpRaw);
+  if (!curp || curp.length < 18) {
+    return { deleted: false, reason: "CURP_INVALIDA" };
+  }
+
+  const draftDir = path.join(draftsRoot(), curp);
+  if (!fssync.existsSync(draftDir)) {
+    return { deleted: false, reason: "NO_EXISTE" };
+  }
+
+  await fs.rm(draftDir, { recursive: true, force: true });
+  return { deleted: true, curp };
+}
+
 module.exports = {
   FILE_FIELDS,
   normalizeCurp,
@@ -382,4 +398,5 @@ module.exports = {
   mergeDraftFilesWithUploads,
   findCompletedRegistration,
   markCurpCompleted,
+  deleteLocalDraft,
 };

@@ -3,7 +3,7 @@ const express = require("express");
 const { upload, validateUploadedFiles } = require("../middleware/upload");
 const { setJob, getJob } = require("../services/jobStore");
 const { saveRegistrationToLocalExcel, FILE_FIELDS } = require("../services/localExcelArchive");
-const { mergeDraftFilesWithUploads, getCurpFromReview, findCompletedRegistration, markCurpCompleted } = require("../services/localDraftStore");
+const { mergeDraftFilesWithUploads, getCurpFromReview, findCompletedRegistration, markCurpCompleted, deleteLocalDraft } = require("../services/localDraftStore");
 const { archiveRegistrationToGoogle, assertNoDuplicateFinalRegistration } = require("../services/googleArchive");
 const { ENV } = require("../config/env");
 
@@ -105,13 +105,16 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
       });
     }
 
+    const completedCurp = getCurpFromReview(finalReview);
     await markCurpCompleted({
-      curp: getCurpFromReview(finalReview),
+      curp: completedCurp,
       credentialId: result.credentialId,
       jobId,
       googleArchive,
       localArchive: result,
     });
+
+    await deleteLocalDraft(completedCurp);
 
     setJob(jobId, {
       ok: true,

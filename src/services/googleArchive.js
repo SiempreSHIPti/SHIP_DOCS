@@ -2,6 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const mime = require("mime-types");
+const sharp = require("sharp");
 const { ENV, assertGoogleArchiveConfig } = require("../config/env");
 const { getClients } = require("../lib/google");
 
@@ -10,7 +11,7 @@ const GOOGLE_FILE_FIELDS = [
   ["estado_cuenta", "Estado de cuenta"],
   ["ine_frontal", "INE frontal"],
   ["ine_reverso", "INE reverso"],
-  ["curp", "CURP"],
+  ["curp", "CURP archivo"],
   ["nss_file", "Documento NSS"],
   ["constancia", "Constancia fiscal"],
   ["acta", "Acta nacimiento"],
@@ -192,8 +193,143 @@ function driveFolderUrl(folderId) {
   return `https://drive.google.com/drive/folders/${folderId}`;
 }
 
+
+function escapeDriveQueryValue(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function driveFileUrl(fileId) {
+  return `https://drive.google.com/file/d/${fileId}/view`;
+}
+
+function isImageMime(mimeType) {
+  return /^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(String(mimeType || ""));
+}
+
+function extensionForUpload({ originalName, localPath, mimeType }) {
+  if (isImageMime(mimeType)) return ".jpg";
+  const ext = path.extname(originalName || localPath || "").toLowerCase();
+  if (ext) return ext;
+  const detected = mime.extension(mimeType || mime.lookup(localPath) || "");
+  return detected ? `.${detected}` : ".bin";
+}
+
+function columnFileName(label, ext) {
+  const cleanLabel = String(label || "Documento")
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${cleanLabel}${ext || ""}`;
+}
+
+async function prepareFileForDrive({ localPath, originalName, mimeType, label }) {
+  const detectedMime = mimeType || mime.lookup(localPath) || "application/octet-stream";
+  const originalExt = extensionForUpload({ originalName, localPath, mimeType: detectedMime });
+  const driveName = columnFileName(label, originalExt);
+
+  if (!isImageMime(detectedMime)) {
+    return {
+      localPath,
+      name: driveName,
+      mimeType: detectedMime,
+      temporary: false,
+    };
+  }
+
+  const tmpDir = path.join("/tmp", "ship-drive-optimized");
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  const tmpPath = path.join(
+    tmpDir,
+    `${Date.now()}_${Math.random().toString(16).slice(2)}_${String(label || "documento").replace(/[^a-z0-9]+/gi, "_")}.jpg`
+  );
+
+  try {
+    await sharp(localPath)
+      .rotate()
+      .resize({
+        width: 1800,
+        height: 1800,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({
+        quality: 72,
+        mozjpeg: true,
+      })
+      .toFile(tmpPath);
+
+    const originalSize = fs.existsSync(localPath) ? fs.statSync(localPath).size : 0;
+    const optimizedSize = fs.existsSync(tmpPath) ? fs.statSync(tmpPath).size : 0;
+
+    // Si por alguna razón la versión optimizada pesa más, usa el original.
+    if (originalSize && optimizedSize && optimizedSize >= originalSize) {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+      return {
+        localPath,
+        name: driveName,
+        mimeType: detectedMime,
+        temporary: false,
+      };
+    }
+
+    return {
+      localPath: tmpPath,
+      name: columnFileName(label, ".jpg"),
+      mimeType: "image/jpeg",
+      temporary: true,
+      originalSize,
+      optimizedSize,
+    };
+  } catch (err) {
+    console.warn("[googleArchive] No se pudo comprimir imagen; se sube original:", err?.message || err);
+    return {
+      localPath,
+      name: driveName,
+      mimeType: detectedMime,
+      temporary: false,
+    };
+  }
+}
+
+async function trashExistingFileByName(drive, { parentId, name }) {
+  const escapedName = escapeDriveQueryValue(name);
+  const q = [
+    `'${parentId}' in parents`,
+    `name = '${escapedName}'`,
+    "trashed = false",
+  ].join(" and ");
+
+  const found = await drive.files.list({
+    q,
+    fields: "files(id,name)",
+    pageSize: 20,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  const files = found.data.files || [];
+  for (const file of files) {
+    try {
+      await drive.files.update({
+        fileId: file.id,
+        requestBody: { trashed: true },
+        supportsAllDrives: true,
+      });
+    } catch (err) {
+      console.warn("[googleArchive] No se pudo reemplazar archivo previo:", file.name, err?.message || err);
+    }
+  }
+
+  return files.length;
+}
+
+async function trashFileByNameIfExists(drive, { parentId, name }) {
+  return trashExistingFileByName(drive, { parentId, name });
+}
+
 async function findOrCreateFolder(drive, { name, parentId }) {
-  const escaped = name.replace(/'/g, "\\'");
+  const escaped = escapeDriveQueryValue(name);
   const q = [
     "mimeType = 'application/vnd.google-apps.folder'",
     `name = '${escaped}'`,
@@ -231,6 +367,8 @@ async function uploadFileToDrive(drive, { parentId, localPath, name, mimeType })
 
   const detectedMime = mimeType || mime.lookup(localPath) || "application/octet-stream";
 
+  await trashExistingFileByName(drive, { parentId, name });
+
   const uploaded = await drive.files.create({
     requestBody: {
       name,
@@ -240,13 +378,33 @@ async function uploadFileToDrive(drive, { parentId, localPath, name, mimeType })
       mimeType: detectedMime,
       body: fs.createReadStream(localPath),
     },
-    fields: "id,name,mimeType,webViewLink,webContentLink",
+    fields: "id,name,mimeType,size,webViewLink,webContentLink",
     supportsAllDrives: true,
   });
 
   return {
     ...uploaded.data,
     webViewLink: uploaded.data.webViewLink || driveWebViewUrl(uploaded.data.id),
+  };
+}
+
+async function uploadPreparedFileToDrive(drive, { parentId, prepared }) {
+  const uploaded = await uploadFileToDrive(drive, {
+    parentId,
+    localPath: prepared.localPath,
+    name: prepared.name,
+    mimeType: prepared.mimeType,
+  });
+
+  if (prepared.temporary) {
+    try { fs.unlinkSync(prepared.localPath); } catch (_) {}
+  }
+
+  return {
+    ...uploaded,
+    optimized: prepared.temporary || false,
+    originalSize: prepared.originalSize || null,
+    optimizedSize: prepared.optimizedSize || null,
   };
 }
 
@@ -388,6 +546,160 @@ async function appendToSheet(sheets, row) {
 
 
 
+
+async function readSheetRows(sheets) {
+  const spreadsheetId = ENV.SPREADSHEET_ID;
+  const sheetName = sheetTitle();
+  const quotedSheet = a1SheetName(sheetName);
+
+  await ensureSheetHeader(sheets);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${quotedSheet}!A:AF`,
+  }).catch((err) => {
+    if (err?.code === 400 || err?.code === 404) return { data: { values: [] } };
+    throw err;
+  });
+
+  return response.data.values || [];
+}
+
+function rowStatus(row) {
+  return String(row?.[11] || "").trim().toUpperCase();
+}
+
+function rowCurp(row) {
+  return normalizeCurpForLookup(row?.[10] || "");
+}
+
+function isDraftStatus(status) {
+  return ["BORRADOR", "AVANCE_GUARDADO", "DRAFT"].includes(String(status || "").toUpperCase());
+}
+
+async function findRowsByCurp(sheets, curpRaw) {
+  const curp = normalizeCurpForLookup(curpRaw);
+  const rows = await readSheetRows(sheets);
+  const matches = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i] || [];
+    if (rowCurp(row) === curp) {
+      matches.push({
+        rowNumber: i + 1,
+        row,
+        status: rowStatus(row),
+      });
+    }
+  }
+
+  return matches;
+}
+
+async function updateSheetRow(sheets, rowNumber, row) {
+  const spreadsheetId = ENV.SPREADSHEET_ID;
+  const quotedSheet = a1SheetName(sheetTitle());
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${quotedSheet}!A${rowNumber}:AF${rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [row],
+    },
+  });
+
+  return {
+    updated: true,
+    rowNumber,
+  };
+}
+
+async function deleteSheetRows(sheets, rowNumbers) {
+  const unique = [...new Set((rowNumbers || []).filter((n) => Number.isInteger(n) && n > 1))].sort((a, b) => b - a);
+  if (!unique.length) return { deleted: 0 };
+
+  const spreadsheetId = ENV.SPREADSHEET_ID;
+  const sheetProps = await ensureSheetTabExists(sheets, spreadsheetId, sheetTitle());
+  const sheetId = sheetProps.sheetId;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: unique.map((rowNumber) => ({
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: "ROWS",
+            startIndex: rowNumber - 1,
+            endIndex: rowNumber,
+          },
+        },
+      })),
+    },
+  });
+
+  return { deleted: unique.length };
+}
+
+async function upsertDraftSheetRow(sheets, { curp, row }) {
+  const matches = await findRowsByCurp(sheets, curp);
+  const draftRows = matches.filter((m) => isDraftStatus(m.status));
+
+  if (draftRows.length) {
+    const target = draftRows[0];
+    await updateSheetRow(sheets, target.rowNumber, row);
+    await deleteSheetRows(sheets, draftRows.slice(1).map((m) => m.rowNumber));
+    return {
+      mode: "updated_draft",
+      rowNumber: target.rowNumber,
+    };
+  }
+
+  const appended = await appendToSheet(sheets, row);
+  return {
+    mode: "appended_draft",
+    append: appended,
+  };
+}
+
+async function upsertFinalSheetRow(sheets, { curp, row }) {
+  const matches = await findRowsByCurp(sheets, curp);
+  const finalRows = matches.filter((m) => !isDraftStatus(m.status));
+  const draftRows = matches.filter((m) => isDraftStatus(m.status));
+
+  if (finalRows.length) {
+    const err = new Error(`La CURP ${curp} ya tiene un registro final. No se puede registrar de nuevo.`);
+    err.code = "DUPLICATE_CURP";
+    err.duplicate = {
+      rowNumber: finalRows[0].rowNumber,
+      curp,
+      status: finalRows[0].status,
+      nombre: finalRows[0].row?.[3] || "",
+      credentialId: finalRows[0].row?.[2] || "",
+      folderLink: finalRows[0].row?.[17] || "",
+      credentialLink: finalRows[0].row?.[18] || "",
+    };
+    throw err;
+  }
+
+  if (draftRows.length) {
+    const target = draftRows[0];
+    await updateSheetRow(sheets, target.rowNumber, row);
+    await deleteSheetRows(sheets, draftRows.slice(1).map((m) => m.rowNumber));
+    return {
+      mode: "updated_from_draft",
+      rowNumber: target.rowNumber,
+    };
+  }
+
+  const appended = await appendToSheet(sheets, row);
+  return {
+    mode: "appended_final",
+    append: appended,
+  };
+}
+
 async function findFinalRegistrationByCurp(curpRaw) {
   if (!isEnabled()) return null;
 
@@ -397,40 +709,20 @@ async function findFinalRegistrationByCurp(curpRaw) {
   assertGoogleArchiveConfig();
 
   const { sheets } = await getClients();
-  const spreadsheetId = ENV.SPREADSHEET_ID;
-  const sheetName = sheetTitle();
-  const quotedSheet = a1SheetName(sheetName);
+  const matches = await findRowsByCurp(sheets, curp);
+  const finalRow = matches.find((m) => !isDraftStatus(m.status));
 
-  await ensureSheetHeader(sheets);
+  if (!finalRow) return null;
 
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${quotedSheet}!A:L`,
-  }).catch((err) => {
-    if (err?.code === 400 || err?.code === 404) return { data: { values: [] } };
-    throw err;
-  });
-
-  const rows = response.data.values || [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i] || [];
-    const rowCurp = normalizeCurpForLookup(row[10] || "");
-    const status = String(row[11] || "").toUpperCase();
-
-    if (rowCurp === curp && !["BORRADOR", "AVANCE_GUARDADO", "DRAFT"].includes(status)) {
-      return {
-        rowNumber: i + 1,
-        curp,
-        status,
-        nombre: row[3] || "",
-        credentialId: row[2] || "",
-        folderLink: row[17] || "",
-        credentialLink: row[18] || "",
-      };
-    }
-  }
-
-  return null;
+  return {
+    rowNumber: finalRow.rowNumber,
+    curp,
+    status: finalRow.status,
+    nombre: finalRow.row?.[3] || "",
+    credentialId: finalRow.row?.[2] || "",
+    folderLink: finalRow.row?.[17] || "",
+    credentialLink: finalRow.row?.[18] || "",
+  };
 }
 
 async function assertNoDuplicateFinalRegistration(curpRaw) {
@@ -471,12 +763,16 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
     const localPath = info?.absolutePath || (info?.relativePath ? path.resolve(process.cwd(), info.relativePath) : "");
     if (!localPath || !fs.existsSync(localPath)) continue;
 
-    const ext = path.extname(info.originalName || localPath) || path.extname(localPath);
-    googleFiles[fieldName] = await uploadFileToDrive(drive, {
-      parentId: driverFolder.id,
+    const prepared = await prepareFileForDrive({
       localPath,
-      name: `${label}${ext}`,
+      originalName: info.originalName,
       mimeType: info.mimeType,
+      label,
+    });
+
+    googleFiles[fieldName] = await uploadPreparedFileToDrive(drive, {
+      parentId: driverFolder.id,
+      prepared,
     });
   }
 
@@ -494,7 +790,7 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
     googleFiles.draftManifest = await uploadFileToDrive(drive, {
       parentId: driverFolder.id,
       localPath: manifestPath,
-      name: "draft_manifest.json",
+      name: "Borrador registro.json",
       mimeType: "application/json",
     });
   } catch (err) {
@@ -517,7 +813,7 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
     rowStatus: "BORRADOR",
   });
 
-  const sheetAppend = await appendToSheet(sheets, row);
+  const sheetAppend = await upsertDraftSheetRow(sheets, { curp, row });
 
   return {
     ok: true,
@@ -568,20 +864,29 @@ async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayloa
     const info = localResult.filePaths?.[fieldName];
     if (!info?.absolutePath) continue;
 
-    const ext = path.extname(info.originalName || info.absolutePath) || path.extname(info.absolutePath);
-    googleFiles[fieldName] = await uploadFileToDrive(drive, {
-      parentId: driverFolder.id,
+    const prepared = await prepareFileForDrive({
       localPath: info.absolutePath,
-      name: `${label}${ext}`,
+      originalName: info.originalName,
       mimeType: info.mimeType,
+      label,
+    });
+
+    googleFiles[fieldName] = await uploadPreparedFileToDrive(drive, {
+      parentId: driverFolder.id,
+      prepared,
     });
   }
+
+  await trashFileByNameIfExists(drive, {
+    parentId: driverFolder.id,
+    name: "Borrador registro.json",
+  });
 
   if (localResult.credentialPdf?.absolutePath) {
     googleFiles.credentialPdf = await uploadFileToDrive(drive, {
       parentId: driverFolder.id,
       localPath: localResult.credentialPdf.absolutePath,
-      name: `Credencial_${safeName(bodyData.nombre)}.pdf`,
+      name: "Credencial PDF.pdf",
       mimeType: "application/pdf",
     });
   }
@@ -594,7 +899,8 @@ async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayloa
     reviewPayload,
   });
 
-  const sheetAppend = await appendToSheet(sheets, row);
+  const curp = normalizeCurpForLookup(bodyData.curpTxt || localResult.curp || "");
+  const sheetAppend = await upsertFinalSheetRow(sheets, { curp, row });
 
   return {
     ok: true,
