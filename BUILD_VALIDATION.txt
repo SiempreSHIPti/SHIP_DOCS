@@ -64,14 +64,12 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "field_visibility_helper": true,
-  "driver_shows_all_vehicle": true,
-  "hidden_fields_disabled_cleared": true,
-  "chofer_copy_only_licencia": true,
-  "ayudante_copy_no_vehicle": true,
-  "css_hides_field_not_applicable": true,
-  "css_hides_vehicle_step_progress": true,
-  "ayudante_skips_vehicle_logic": true,
-  "summary_omits_backend": true,
-  "targeted_revalidation_kept": true
+  "visual_step_number_helper": true,
+  "references_renumbered_to_3": true,
+  "dot_uses_visual_number": true,
+  "vehicle_step_still_hidden": true,
+  "connector_line_kept": true,
+  "vehicle_and_next_line_hidden": true,
+  "skip_logic_kept": true,
+  "hide_non_required_fields_kept": true
 }

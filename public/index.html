@@ -2336,10 +2336,15 @@
       `;
     }
 
+    function visualStepNumber(stepNum) {
+      return !isVehicleStepRequired() && Number(stepNum) === 4 ? 3 : Number(stepNum);
+    }
+
     function updateProgress(step) {
       document.querySelectorAll(".progress-step").forEach((stepEl, index) => {
         const stepNum = index + 1;
-        stepEl.classList.remove("active", "completed", "validating");
+        const visualNum = visualStepNumber(stepNum);
+        stepEl.classList.remove("active", "completed", "validating", "not-applicable", "visually-renumbered");
         const dot = stepEl.querySelector(".progress-dot");
 
         if (stepNum === 3 && !isVehicleStepRequired()) {
@@ -2353,9 +2358,11 @@
           if (dot) dot.innerHTML = '<span class="progress-dot-spinner"></span>';
         } else if (stepNum === step) {
           stepEl.classList.add("active");
-          if (dot) dot.innerHTML = String(stepNum);
+          if (stepNum !== visualNum) stepEl.classList.add("visually-renumbered");
+          if (dot) dot.innerHTML = String(visualNum);
         } else if (dot) {
-          dot.innerHTML = String(stepNum);
+          if (stepNum !== visualNum) stepEl.classList.add("visually-renumbered");
+          dot.innerHTML = String(visualNum);
         }
       });
     }

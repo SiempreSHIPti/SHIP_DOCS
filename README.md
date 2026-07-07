@@ -1,3 +1,9 @@
+# Fix progreso renumerado para Ayudante
+
+Se ajustó el progreso para que Referencias se vea como paso 3 cuando Vehículo no aplica. Ver `README-FIX-PROGRESO-RENUMERADO-AYUDANTE.md`.
+
+---
+
 # Fix ocultar campos no obligatorios
 
 Se ocultan por completo los campos que no son obligatorios según la vacante y se oculta el paso Vehículo para Ayudante. Ver `README-FIX-OCULTAR-CAMPOS-NO-OBLIGATORIOS.md`.

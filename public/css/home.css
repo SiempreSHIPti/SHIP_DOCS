@@ -699,6 +699,7 @@ body.pre-registration #resume-card h3 {
 }
 
 .progress-step.validating span::after {
+  content: " validando";
   color: #ff6b7b;
   font-size: 10px;
   margin-left: 4px;
@@ -769,4 +770,29 @@ body.skip-vehicle-step .progress-bar > :nth-child(6),
 
 body.skip-vehicle-step .progress-step[data-step="3"] {
   display: none !important;
+}
+
+
+
+/* ===== Progreso renumerado cuando Vehículo no aplica ===== */
+/* Mantiene la línea entre Documentos y Referencias, oculta sólo el paso Vehículo y la línea posterior. */
+body.skip-vehicle-step .progress-bar > :nth-child(4),
+.progress-bar.skip-vehicle-step > :nth-child(4) {
+  display: block !important;
+}
+
+body.skip-vehicle-step .progress-bar > :nth-child(5),
+body.skip-vehicle-step .progress-bar > :nth-child(6),
+.progress-bar.skip-vehicle-step > :nth-child(5),
+.progress-bar.skip-vehicle-step > :nth-child(6) {
+  display: none !important;
+}
+
+body.skip-vehicle-step .progress-step[data-step="4"] .progress-dot,
+.progress-bar.skip-vehicle-step .progress-step[data-step="4"] .progress-dot {
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-step.visually-renumbered span::after {
+  content: "";
 }
