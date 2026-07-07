@@ -231,69 +231,6 @@ function isPdfMime(mimeType, localPath) {
   return mimeVal === "application/pdf" || ext === ".pdf";
 }
 
-function compressionScriptPath() {
-  return path.resolve(process.cwd(), "scripts", "compress_document.py");
-}
-
-async function compressPdfForDrive({ localPath, label }) {
-  const originalSize = fs.existsSync(localPath) ? fs.statSync(localPath).size : 0;
-  if (!originalSize) return null;
-
-  const tmpDir = path.join("/tmp", "ship-drive-optimized");
-  fs.mkdirSync(tmpDir, { recursive: true });
-
-  const tmpPath = path.join(
-    tmpDir,
-    `${Date.now()}_${Math.random().toString(16).slice(2)}_${String(label || "documento").replace(/[^a-z0-9]+/gi, "_")}.pdf`
-  );
-
-  try {
-    const { stdout } = await execFileAsync("python3", [
-      compressionScriptPath(),
-      localPath,
-      tmpPath,
-      "--mime",
-      "application/pdf",
-      "--target-bytes",
-      String(TARGET_DRIVE_FILE_BYTES),
-    ], {
-      timeout: 120000,
-      maxBuffer: 1024 * 1024,
-    });
-
-    let info = {};
-    try { info = JSON.parse(String(stdout || "{}")); } catch (_) {}
-
-    const optimizedSize = fs.existsSync(tmpPath) ? fs.statSync(tmpPath).size : 0;
-
-    if (!optimizedSize || optimizedSize >= originalSize) {
-      try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
-      return null;
-    }
-
-    if (optimizedSize > TARGET_DRIVE_FILE_BYTES) {
-      console.warn("[googleArchive] PDF comprimido con Python sigue sobre 5 MB; se sube comprimido por ser menor que el original.", {
-        originalSize,
-        optimizedSize,
-        info,
-      });
-    }
-
-    return {
-      localPath: tmpPath,
-      mimeType: "application/pdf",
-      temporary: true,
-      originalSize,
-      optimizedSize,
-    };
-  } catch (err) {
-    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
-    console.warn("[googleArchive] No se pudo comprimir PDF con Python; se sube original:", err?.message || err);
-    return null;
-  }
-}
-
-
 function extensionForUpload({ originalName, localPath, mimeType }) {
   if (isImageMime(mimeType)) return ".jpg";
   const ext = path.extname(originalName || localPath || "").toLowerCase();
@@ -316,14 +253,6 @@ async function prepareFileForDrive({ localPath, originalName, mimeType, label })
   const driveName = columnFileName(label, originalExt);
 
   if (isPdfMime(detectedMime, localPath)) {
-    const compressed = await compressPdfForDrive({ localPath, label });
-    if (compressed) {
-      return {
-        ...compressed,
-        name: columnFileName(label, ".pdf"),
-      };
-    }
-
     return {
       localPath,
       name: driveName,

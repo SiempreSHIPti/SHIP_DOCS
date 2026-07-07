@@ -1,3 +1,15 @@
+# Fix archivo pesado en rojo sin compresión de usuario
+
+Se eliminó la herramienta de compresión para el usuario y se deja archivo pesado en rojo con instrucción de subir otro archivo menor a 5 MB. Ver `README-FIX-SIN-COMPRESION-USUARIO-ARCHIVO-PESADO-ROJO.md`.
+
+---
+
+# Fix compresión PDF raster con Python
+
+Se agregó fallback de rasterizado con pypdfium2 para PDFs que no reducen con compresión estructural. Ver `README-FIX-COMPRESION-PYTHON-RASTER-PDF.md`.
+
+---
+
 # Fix compresión Python sin Ghostscript
 
 Se agregó compresión con script Python para imágenes/PDF y se eliminó dependencia de Ghostscript. Ver `README-FIX-COMPRESION-PYTHON-SIN-GHOSTSCRIPT.md`.

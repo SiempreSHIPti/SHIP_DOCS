@@ -1,10 +1,6 @@
 // src/routes/finalDocumentReview.js
 const express = require("express");
-const fs = require("fs");
-const path = require("path");
-const { promisify } = require("util");
-const { execFile } = require("child_process");
-const { upload, validateUploadedFiles, detectMagic } = require("../middleware/upload");
+const { upload, validateUploadedFiles } = require("../middleware/upload");
 const { setJob, getJob } = require("../services/jobStore");
 const { validateDocument, DOC_RULES } = require("../services/documentValidation");
 const { toUpperClean, digitsOnly } = require("../utils/strings");
@@ -13,7 +9,6 @@ const { ENV } = require("../config/env");
 const { findFinalRegistrationByCurp } = require("../services/googleArchive");
 
 const router = express.Router();
-const execFileAsync = promisify(execFile);
 const AI_VALIDATION_MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 function useGoogleArchiveAsRegistry() {
@@ -97,147 +92,22 @@ function buildHeavyFileSkippedResult(fieldName, heavyInfo = {}, body = {}) {
   return {
     fieldName,
     label: FIELD_LABELS[fieldName] || fieldName,
-    ok: true,
-    status: "warning",
-    severity: "warning",
-    recommendation: blocking ? "fix_required" : "manual_review",
+    ok: false,
+    status: "rejected",
+    severity: "error",
+    recommendation: "fix_required",
     fileName,
-    issues: [],
-    warnings: [
-      blocking
-        ? `No se validó con IA porque el archivo excede 5 MB${sizeText}. Debe corregirse para guardar el registro final.`
-        : `No se validó con IA porque el archivo excede 5 MB${sizeText}. Documento opcional; no bloquea si decides no usarlo.`
+    issues: [
+      `No se pudo validar porque el archivo excede el peso permitido de 5 MB${sizeText}. Sube otro archivo menor a 5 MB.`
     ],
-    summary: blocking
-      ? "No se validó con IA porque excede el peso permitido para revisión automática. Intenta comprimirlo o sube otro archivo más ligero."
-      : "Documento opcional cargado, pero no validado por peso. No bloquea el registro si no es requerido.",
+    warnings: [],
+    summary: "No se pudo validar porque excede el peso permitido. Sube otro archivo menor a 5 MB.",
     skippedByWeight: true,
     blocking,
     validatedAt: new Date().toISOString(),
   };
 }
 
-
-function compressionScriptPath() {
-  return path.resolve(process.cwd(), "scripts", "compress_document.py");
-}
-
-function tempCompressionPath(file, ext = "") {
-  const tmpDir = path.join("/tmp", "ship-ai-compression");
-  fs.mkdirSync(tmpDir, { recursive: true });
-  const safeExt = ext || path.extname(file.originalname || "") || ".bin";
-  return path.join(tmpDir, `${Date.now()}_${Math.random().toString(16).slice(2)}${safeExt}`);
-}
-
-async function compressFileForAi(file) {
-  const originalSize = Number(file?.size || file?.buffer?.length || 0);
-
-  if (!file?.buffer?.length) {
-    return { ok: false, reason: "No se recibió archivo para comprimir." };
-  }
-
-  const inputExt = path.extname(file.originalname || "") || (String(file.mimetype || "").includes("pdf") ? ".pdf" : ".bin");
-  const outputExt = String(file.mimetype || "").startsWith("image/") ? ".jpg" : inputExt;
-  const inputPath = tempCompressionPath(file, inputExt);
-  const outputPath = tempCompressionPath(file, outputExt);
-
-  try {
-    fs.writeFileSync(inputPath, file.buffer);
-
-    const { stdout } = await execFileAsync("python3", [
-      compressionScriptPath(),
-      inputPath,
-      outputPath,
-      "--mime",
-      file.mimetype || "application/octet-stream",
-      "--target-bytes",
-      String(AI_VALIDATION_MAX_FILE_BYTES),
-    ], {
-      timeout: 120000,
-      maxBuffer: 1024 * 1024,
-    });
-
-    const info = JSON.parse(String(stdout || "{}"));
-    const compressedBuffer = fs.existsSync(outputPath) ? fs.readFileSync(outputPath) : null;
-
-    if (!compressedBuffer?.length) {
-      return {
-        ok: false,
-        reason: info.reason || "El script de compresión no generó archivo de salida.",
-        originalSize,
-        compressedSize: Number(info.compressed_size || 0) || null,
-      };
-    }
-
-    const isImage = String(file.mimetype || "").startsWith("image/");
-    const mimetype = isImage ? "image/jpeg" : file.mimetype;
-    const suffix = isImage ? "_comprimido.jpg" : "_comprimido.pdf";
-    const originalBase = String(file.originalname || file.fieldname || "documento").replace(/\.[^.]+$/, "");
-
-    return {
-      ok: true,
-      file: {
-        buffer: compressedBuffer,
-        mimetype,
-        originalname: `${originalBase}${suffix}`,
-        size: compressedBuffer.length,
-      },
-      originalSize,
-      compressedSize: compressedBuffer.length,
-      improved: compressedBuffer.length < originalSize,
-      scriptInfo: info,
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      reason: err?.message || "No se pudo ejecutar el script Python de compresión.",
-      originalSize,
-      compressedSize: null,
-    };
-  } finally {
-    try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch (_) {}
-    try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch (_) {}
-  }
-}
-
-
-function mergeReviewResultIntoPayload({ jobId, body, fieldName, result }) {
-  const job = getJob(jobId) || {};
-  const previousValidation = job.data?.documentValidation || {};
-  const mergedValidation = {
-    ...previousValidation,
-    [fieldName]: result,
-  };
-
-  const results = buildFinalResultsFromStoredValidation(body, mergedValidation);
-  const summary = summarize(results);
-
-  const finalReview = {
-    summary,
-    results,
-    reviewedAt: new Date().toISOString(),
-    source: "compressed_target_validation",
-  };
-
-  setJob(jobId, {
-    ok: summary.canContinue,
-    state: "ai_review_completed",
-    message: summary.canContinue
-      ? "Resumen actualizado con archivo comprimido."
-      : "Resumen actualizado; aún hay documentos por revisar.",
-    data: {
-      ...(job.data || {}),
-      documentValidation: mergedValidation,
-      finalReview,
-    },
-    validationErrors: results.filter((x) => x.ok === false),
-    validationWarnings: results.filter((x) => x.status === "warning" || x.severity === "warning"),
-    finalReviewSummary: summary,
-    saved: false,
-  });
-
-  return finalReview;
-}
 
 function parsePartialFields(value) {
   if (!value) return new Set();
@@ -722,174 +592,6 @@ function summarize(results) {
   };
 }
 
-
-function processSingleDocumentUpload(req, res, next) {
-  const ct = req.headers["content-type"];
-  if (typeof ct === "string" && ct.includes("multipart/form-data") && !hasBoundary(req)) {
-    return res.status(400).json({ ok: false, error: "multipart/form-data inválido" });
-  }
-
-  upload.single("document")(req, res, (err) => {
-    if (err) {
-      console.error("[/api/registration/compress-and-validate-document] Multer error:", err);
-      return res.status(400).json({ ok: false, error: `Error leyendo archivo: ${err.message}` });
-    }
-
-    if (!req.file?.buffer) {
-      return res.status(400).json({ ok: false, error: "Falta archivo para comprimir." });
-    }
-
-    const detected = detectMagic(req.file.buffer);
-    const declared = String(req.file.mimetype || "");
-    const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
-
-    if (!allowed.has(detected)) {
-      return res.status(400).json({ ok: false, error: "El archivo no parece ser PDF/imagen válida." });
-    }
-
-    if (detected !== declared && !(declared === "image/jpeg" && detected === "image/jpeg")) {
-      return res.status(400).json({ ok: false, error: "El archivo no coincide con su tipo declarado." });
-    }
-
-    next();
-  });
-}
-
-router.post("/api/registration/compress-and-validate-document", processSingleDocumentUpload, async (req, res) => {
-  const jobId = String(req.body.jobId || "").trim();
-  const fieldName = String(req.body.fieldName || "").trim();
-  const expectedName = normalizeDriverNameForValidation(req.body.nombre || req.body.expectedName || "SIN_NOMBRE");
-
-  if (!jobId) return res.status(400).json({ ok: false, error: "Falta jobId." });
-  if (!FILE_FIELDS.includes(fieldName)) return res.status(400).json({ ok: false, error: "Documento no soportado." });
-
-  const originalFile = req.file;
-  const compressed = await compressFileForAi(originalFile);
-
-  if (!compressed.ok) {
-    const result = {
-      ...buildHeavyFileSkippedResult(fieldName, {
-        fileName: originalFile.originalname,
-        size: originalFile.size || originalFile.buffer?.length || 0,
-      }, req.body),
-      compressionAttempted: true,
-      compressionSufficient: false,
-      originalSize: originalFile.size || originalFile.buffer?.length || 0,
-      compressedSize: null,
-      warnings: [
-        `Se intentó comprimir el archivo con el compresor del sistema, pero no fue posible: ${compressed.reason}. Sube otro archivo con menor peso.`,
-      ],
-      summary: "Se intentó reducir el tamaño del archivo, pero no fue posible. Sube otro archivo con menor peso para validarlo con IA.",
-    };
-
-    const finalReview = mergeReviewResultIntoPayload({ jobId, body: req.body, fieldName, result });
-
-    return res.json({
-      ok: true,
-      compressed: false,
-      canValidate: false,
-      result,
-      summary: finalReview.summary,
-      results: finalReview.results,
-      message: "No se pudo comprimir el archivo para validarlo con IA.",
-    });
-  }
-
-  if ((compressed.file.size || compressed.file.buffer?.length || 0) > AI_VALIDATION_MAX_FILE_BYTES) {
-    const result = {
-      ...buildHeavyFileSkippedResult(fieldName, {
-        fileName: compressed.file.originalname || originalFile.originalname,
-        size: compressed.file.size || compressed.file.buffer?.length || 0,
-      }, req.body),
-      compressed: true,
-      compressionAttempted: true,
-      compressionSufficient: false,
-      originalSize: compressed.originalSize,
-      compressedSize: compressed.compressedSize,
-      warnings: [
-        `Se intentó reducir el archivo de ${formatMb(compressed.originalSize)} a ${formatMb(compressed.compressedSize)}, pero aún excede 5 MB. Sube otro archivo con menor peso.`,
-      ],
-      summary: "Se intentó reducir su tamaño, pero no fue suficiente para validarlo con IA. Sube otro archivo con menor peso.",
-    };
-
-    const finalReview = mergeReviewResultIntoPayload({ jobId, body: req.body, fieldName, result });
-
-    return res.json({
-      ok: true,
-      compressed: true,
-      canValidate: false,
-      result,
-      summary: finalReview.summary,
-      results: finalReview.results,
-      message: "Se intentó comprimir el archivo, pero aún excede 5 MB. Sube otro archivo con menor peso.",
-    });
-  }
-
-  try {
-    const validation = await validateDocument({
-      jobId,
-      fieldName,
-      file: compressed.file,
-      expectedName: expectedName || "SIN_NOMBRE",
-    });
-
-    const operationalResult = applyOperationalRules(validation, fieldName, expectedName || "SIN_NOMBRE");
-
-    const status = operationalResult.severity === "warning" || operationalResult.status === "warning"
-      ? "warning"
-      : operationalResult.ok
-        ? "approved"
-        : "rejected";
-
-    const result = {
-      ...operationalResult,
-      status,
-      fileName: compressed.file.originalname,
-      originalFileName: originalFile.originalname,
-      compressed: true,
-      compressionAttempted: true,
-      compressionSufficient: true,
-      originalSize: compressed.originalSize,
-      compressedSize: compressed.compressedSize,
-      validatedAt: new Date().toISOString(),
-    };
-
-    const finalReview = mergeReviewResultIntoPayload({ jobId, body: req.body, fieldName, result });
-
-    return res.json({
-      ok: true,
-      compressed: true,
-      canValidate: true,
-      result,
-      summary: finalReview.summary,
-      results: finalReview.results,
-      message: "Archivo comprimido y validado correctamente.",
-    });
-  } catch (err) {
-    const result = {
-      ...buildErrorResult(fieldName, err),
-      fileName: compressed.file.originalname || originalFile.originalname,
-      compressed: true,
-      compressionAttempted: true,
-      compressionSufficient: true,
-      originalSize: compressed.originalSize,
-      compressedSize: compressed.compressedSize,
-      validatedAt: new Date().toISOString(),
-    };
-
-    const finalReview = mergeReviewResultIntoPayload({ jobId, body: req.body, fieldName, result });
-
-    return res.json({
-      ok: true,
-      compressed: true,
-      canValidate: false,
-      result,
-      summary: finalReview.summary,
-      results: finalReview.results,
-      message: "El archivo se comprimió, pero no pudo validarse con IA.",
-    });
-  }
-});
 
 router.post("/api/registration/final-review", processUploadMiddleware, async (req, res) => {
   const jobId = String(req.body.jobId || "").trim();

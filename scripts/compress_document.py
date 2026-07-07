@@ -4,11 +4,13 @@ Compress document files without Ghostscript.
 
 Dependencies:
 - Pillow: image compression.
-- pypdf: best-effort PDF stream/image compression.
+- pypdf: structural best-effort PDF compression.
+- pypdfium2: PDF rendering/raster fallback using PDFium.
 
-This script never guarantees a PDF will be under target size; it prints JSON with
-original/compressed size so the application can decide whether to validate or ask
-for a lighter file.
+PDF compression strategy:
+1) Try structural recompression with pypdf/Pillow.
+2) If it does not reduce enough, render pages to compressed images and rebuild a light PDF.
+3) Report original/final size so the app can validate only if <= target size.
 """
 from __future__ import annotations
 
@@ -18,6 +20,7 @@ import json
 import os
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -38,6 +41,7 @@ def compress_image(input_path: Path, output_path: Path, target_bytes: int) -> di
 
     original_size = file_size(input_path)
     best_bytes = None
+    best_meta = {}
 
     with Image.open(input_path) as img:
         img = ImageOps.exif_transpose(img)
@@ -47,10 +51,10 @@ def compress_image(input_path: Path, output_path: Path, target_bytes: int) -> di
         elif img.mode == "L":
             img = img.convert("RGB")
 
-        # Try progressively smaller/stronger outputs.
         attempts = [
-            (1600, 72), (1400, 65), (1200, 60), (1000, 55),
-            (900, 50), (800, 45), (700, 40), (600, 38),
+            (1800, 72), (1600, 68), (1400, 64), (1200, 60),
+            (1000, 56), (900, 52), (800, 48), (700, 44),
+            (600, 40), (520, 36),
         ]
 
         for max_dim, quality in attempts:
@@ -70,6 +74,12 @@ def compress_image(input_path: Path, output_path: Path, target_bytes: int) -> di
 
             if best_bytes is None or len(data) < len(best_bytes):
                 best_bytes = data
+                best_meta = {
+                    "max_dim": max_dim,
+                    "quality": quality,
+                    "width": candidate.width,
+                    "height": candidate.height,
+                }
 
             if len(data) <= target_bytes:
                 break
@@ -83,10 +93,12 @@ def compress_image(input_path: Path, output_path: Path, target_bytes: int) -> di
     return {
         "ok": True,
         "type": "image",
+        "method": "pillow_image",
         "original_size": original_size,
         "compressed_size": compressed_size,
         "improved": compressed_size < original_size,
         "output_path": str(output_path),
+        **best_meta,
     }
 
 
@@ -122,7 +134,6 @@ def recompress_pdf_images(reader) -> int:
                 if obj.get("/Subtype") != "/Image":
                     continue
 
-                # Avoid breaking transparency-heavy PDFs.
                 if obj.get("/SMask") is not None or obj.get("/Mask") is not None:
                     continue
 
@@ -140,10 +151,9 @@ def recompress_pdf_images(reader) -> int:
                     img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
 
                     buf = io.BytesIO()
-                    img.save(buf, format="JPEG", quality=50, optimize=True, progressive=True)
+                    img.save(buf, format="JPEG", quality=45, optimize=True, progressive=True)
                     data = buf.getvalue()
 
-                    # Only replace if actually smaller.
                     if len(data) >= len(raw):
                         continue
 
@@ -168,11 +178,10 @@ def recompress_pdf_images(reader) -> int:
     return changed
 
 
-def compress_pdf(input_path: Path, output_path: Path, target_bytes: int) -> dict:
+def structural_pdf_compress(input_path: Path, output_path: Path) -> dict:
     from pypdf import PdfReader, PdfWriter
 
     original_size = file_size(input_path)
-    best_path = output_path
 
     try:
         reader = PdfReader(str(input_path), strict=False)
@@ -182,7 +191,6 @@ def compress_pdf(input_path: Path, output_path: Path, target_bytes: int) -> dict
         for page in reader.pages:
             writer.add_page(page)
 
-        # Avoid preserving unnecessary metadata.
         try:
             writer.add_metadata({})
         except Exception:
@@ -193,7 +201,6 @@ def compress_pdf(input_path: Path, output_path: Path, target_bytes: int) -> dict
 
         compressed_size = file_size(output_path)
 
-        # If pypdf output is invalid/empty or bigger, keep original copy but still report attempt.
         if not compressed_size:
             shutil.copyfile(input_path, output_path)
             compressed_size = file_size(output_path)
@@ -204,25 +211,255 @@ def compress_pdf(input_path: Path, output_path: Path, target_bytes: int) -> dict
 
         return {
             "ok": True,
-            "type": "pdf",
+            "method": "pypdf_structural",
             "original_size": original_size,
             "compressed_size": compressed_size,
             "improved": compressed_size < original_size,
             "changed_images": changed_images,
-            "output_path": str(best_path),
-            "note": "Best-effort PDF compression with pypdf/Pillow. Some PDFs may not shrink enough without rasterizing.",
+            "output_path": str(output_path),
         }
     except Exception as exc:
         shutil.copyfile(input_path, output_path)
         return {
-            "ok": True,
-            "type": "pdf",
+            "ok": False,
+            "method": "pypdf_structural",
             "original_size": original_size,
             "compressed_size": file_size(output_path),
             "improved": False,
             "output_path": str(output_path),
-            "warning": f"No se pudo recomprimir el PDF; se conservó el original: {exc}",
+            "warning": str(exc),
         }
+
+
+def render_pdf_to_images(input_path: Path, scale: float, quality: int, max_pages: int = 30) -> list[Path]:
+    import pypdfium2 as pdfium
+    from PIL import Image
+
+    pdf = pdfium.PdfDocument(str(input_path))
+    page_count = len(pdf)
+    if page_count > max_pages:
+        raise RuntimeError(f"El PDF tiene {page_count} páginas; máximo soportado para compresión rápida: {max_pages}.")
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="ship_pdf_pages_"))
+    images: list[Path] = []
+
+    try:
+        for i in range(page_count):
+            page = pdf[i]
+            bitmap = page.render(scale=scale, rotation=0)
+            pil_image = bitmap.to_pil()
+
+            if pil_image.mode not in ("RGB", "L"):
+                pil_image = pil_image.convert("RGB")
+            elif pil_image.mode == "L":
+                pil_image = pil_image.convert("RGB")
+
+            image_path = temp_dir / f"page_{i:04d}.jpg"
+            pil_image.save(
+                image_path,
+                "JPEG",
+                quality=quality,
+                optimize=True,
+                progressive=True,
+                dpi=(110, 110),
+            )
+            images.append(image_path)
+
+            try:
+                pil_image.close()
+            except Exception:
+                pass
+            try:
+                page.close()
+            except Exception:
+                pass
+    finally:
+        try:
+            pdf.close()
+        except Exception:
+            pass
+
+    return images
+
+
+def images_to_pdf(image_paths: list[Path], output_path: Path) -> None:
+    from PIL import Image
+
+    opened = []
+    try:
+        for path in image_paths:
+            img = Image.open(path)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            opened.append(img)
+
+        if not opened:
+            raise RuntimeError("No se generaron imágenes para reconstruir PDF.")
+
+        first, rest = opened[0], opened[1:]
+        first.save(
+            output_path,
+            "PDF",
+            save_all=True,
+            append_images=rest,
+            resolution=110.0,
+            quality=65,
+            optimize=True,
+        )
+    finally:
+        for img in opened:
+            try:
+                img.close()
+            except Exception:
+                pass
+
+
+def cleanup_rendered_images(image_paths: list[Path]) -> None:
+    parent = image_paths[0].parent if image_paths else None
+    for path in image_paths:
+        try:
+            path.unlink()
+        except Exception:
+            pass
+    if parent:
+        try:
+            parent.rmdir()
+        except Exception:
+            pass
+
+
+def raster_pdf_compress(input_path: Path, output_path: Path, target_bytes: int) -> dict:
+    original_size = file_size(input_path)
+    best_bytes = None
+    best_meta = None
+
+    # These attempts sacrifice fidelity gradually. Useful for scanned statements.
+    attempts = [
+        (1.50, 58),
+        (1.25, 52),
+        (1.05, 46),
+        (0.90, 40),
+        (0.78, 35),
+        (0.66, 30),
+    ]
+
+    for scale, quality in attempts:
+        tmp_pdf = output_path.with_suffix(f".raster_{str(scale).replace('.', '_')}_{quality}.pdf")
+        image_paths: list[Path] = []
+        try:
+            image_paths = render_pdf_to_images(input_path, scale=scale, quality=quality)
+            images_to_pdf(image_paths, tmp_pdf)
+            data = tmp_pdf.read_bytes()
+            size = len(data)
+
+            if best_bytes is None or size < len(best_bytes):
+                best_bytes = data
+                best_meta = {
+                    "scale": scale,
+                    "quality": quality,
+                    "pages": len(image_paths),
+                    "candidate_size": size,
+                }
+
+            if size <= target_bytes:
+                break
+        except Exception as exc:
+            if best_meta is None:
+                best_meta = {"warning": str(exc)}
+        finally:
+            cleanup_rendered_images(image_paths)
+            try:
+                if tmp_pdf.exists():
+                    tmp_pdf.unlink()
+            except Exception:
+                pass
+
+    if best_bytes:
+        output_path.write_bytes(best_bytes)
+    else:
+        shutil.copyfile(input_path, output_path)
+
+    compressed_size = file_size(output_path)
+    return {
+        "ok": True,
+        "type": "pdf",
+        "method": "pypdfium2_raster",
+        "original_size": original_size,
+        "compressed_size": compressed_size,
+        "improved": compressed_size < original_size,
+        "output_path": str(output_path),
+        **(best_meta or {}),
+        "note": "PDF rasterizado y reconstruido como PDF de imágenes comprimidas.",
+    }
+
+
+def compress_pdf(input_path: Path, output_path: Path, target_bytes: int) -> dict:
+    original_size = file_size(input_path)
+
+    structural_path = output_path.with_suffix(".structural.pdf")
+    structural = structural_pdf_compress(input_path, structural_path)
+    structural_size = file_size(structural_path)
+
+    # If structural compression already works, use it.
+    if structural_size and structural_size <= target_bytes and structural_size < original_size:
+        shutil.move(str(structural_path), output_path)
+        structural["output_path"] = str(output_path)
+        structural["type"] = "pdf"
+        return structural
+
+    raster_path = output_path.with_suffix(".raster.pdf")
+    raster = raster_pdf_compress(input_path, raster_path, target_bytes)
+    raster_size = file_size(raster_path)
+
+    candidates = []
+    if structural_size:
+        candidates.append(("pypdf_structural", structural_path, structural_size, structural))
+    if raster_size:
+        candidates.append(("pypdfium2_raster", raster_path, raster_size, raster))
+
+    if not candidates:
+        shutil.copyfile(input_path, output_path)
+        return {
+            "ok": True,
+            "type": "pdf",
+            "method": "original_copy",
+            "original_size": original_size,
+            "compressed_size": file_size(output_path),
+            "improved": False,
+            "output_path": str(output_path),
+        }
+
+    # Prefer any candidate under target, otherwise choose smallest candidate.
+    under_target = [x for x in candidates if x[2] <= target_bytes]
+    chosen = min(under_target or candidates, key=lambda x: x[2])
+    method, chosen_path, chosen_size, chosen_info = chosen
+
+    if chosen_size < original_size:
+        shutil.copyfile(chosen_path, output_path)
+    else:
+        shutil.copyfile(input_path, output_path)
+        method = "original_copy"
+
+    for path in [structural_path, raster_path]:
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+
+    compressed_size = file_size(output_path)
+    return {
+        "ok": True,
+        "type": "pdf",
+        "method": method,
+        "original_size": original_size,
+        "compressed_size": compressed_size,
+        "improved": compressed_size < original_size,
+        "output_path": str(output_path),
+        "structural_size": structural_size,
+        "raster_size": raster_size,
+        "note": chosen_info.get("note") or "Best-effort PDF compression.",
+    }
 
 
 def main() -> None:

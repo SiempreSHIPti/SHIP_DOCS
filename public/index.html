@@ -1781,14 +1781,15 @@
 
       return {
         ...row,
-        ok: true,
-        status: "warning",
-        severity: "warning",
-        recommendation: "manual_review",
+        ok: false,
+        status: "rejected",
+        severity: "error",
+        recommendation: "fix_required",
         fileName: info.fileName || row.fileName,
-        warnings: [`Archivo cargado, pero no se validó con IA porque excede 5 MB (${formatMbFromBytes(info.size)}).`],
-        summary: "Archivo cargado, pero no validado por peso. Puedes intentar comprimirlo y validarlo, o subir otro archivo más ligero.",
+        issues: [`No se pudo validar porque excede el peso permitido de 5 MB (${formatMbFromBytes(info.size)}).`],
+        summary: "No se pudo validar porque excede el peso permitido. Sube otro archivo menor a 5 MB.",
         skippedByWeight: true,
+        blocking: true,
         clientHeavyFileFallback: true,
       };
     }
@@ -1796,15 +1797,9 @@
     function friendlyDetailForRow(row) {
       const status = statusForRow(row);
 
-      if (row?.skippedByWeight && row?.compressionAttempted && row?.compressionSufficient === false) {
-        const before = formatMbFromBytes(row.originalSize);
-        const after = formatMbFromBytes(row.compressedSize);
-        return `Se intentó reducir su tamaño${before && after ? ` de ${before} a ${after}` : ""}, pero aún supera 5 MB. Sube otro archivo con menor peso.`;
-      }
-
       if (row?.skippedByWeight) {
         const fileName = row.fileName ? `Archivo cargado: ${row.fileName}. ` : "";
-        return `${fileName}No se validó con IA porque excede 5 MB. Este documento requiere validación para guardar el registro final. Puedes intentar comprimirlo y validarlo, o subir otro archivo más ligero.`;
+        return `${fileName}No se pudo validar porque excede el peso permitido de 5 MB. Sube otro archivo menor a 5 MB.`;
       }
 
       if (status === "approved") return "Listo. Documento correcto.";
@@ -1930,6 +1925,7 @@
     }
 
     function statusForRow(row) {
+      if (row?.skippedByWeight) return "rejected";
       if (row.status === "skipped") return "skipped";
       if (row.status === "warning" || row.severity === "warning") return "warning";
       if (row.status === "approved" || row.ok === true) return "approved";
@@ -2007,13 +2003,9 @@
       list.innerHTML = rows.map((row) => {
         const status = statusForRow(row);
         const label = row.label || DOC_LABELS[row.fieldName] || row.fieldName;
-        const canCompress = !!row.skippedByWeight;
         const canReplace = !row.skippedByWeight && (status === "rejected" || status === "missing" || status === "warning");
         const canUploadLighter = !!row.skippedByWeight;
         const fileName = row.fileName ? `<div class="review-item-file">Archivo revisado: ${row.fileName}</div>` : "";
-        const compressionInfo = row.compressionAttempted
-          ? `<div class="review-item-file">Compresión: ${formatMbFromBytes(row.originalSize) || "tamaño original"} → ${formatMbFromBytes(row.compressedSize) || "tamaño comprimido"}</div>`
-          : "";
         const model = "";
         const owner = row.ownerCheckApplies
           ? `<div class="review-item-file">Titular/propietario: ${row.nameFound || "No detectado"} · ${row.ownerMatchesDriver ? "Coincide con driver" : "Observación"}</div>`
@@ -2026,12 +2018,10 @@
               <div class="review-item-title">${label}</div>
               <div class="review-item-detail">${friendlyDetailForRow(row)}</div>
               ${fileName}
-              ${compressionInfo}
               ${owner}
               ${model}
             </div>
             <div class="review-item-actions">
-              ${canCompress ? `<button type="button" class="review-compress-btn" data-field="${row.fieldName}">Comprimir y validar</button>` : ""}
               ${canUploadLighter ? `<button type="button" class="review-replace-btn" data-field="${row.fieldName}">Subir otro archivo</button>` : ""}
               ${canReplace ? `<button type="button" class="review-replace-btn" data-field="${row.fieldName}">${status === "warning" ? "Cambiar archivo" : "Reemplazar archivo"}</button>` : ""}
             </div>
@@ -2567,9 +2557,9 @@
       }
 
       if (warnings.length) {
-        errEl.textContent = `${warnings[0]}. Puedes continuar al resumen; este archivo no se enviará a IA por peso, pero al guardar intentaremos comprimirlo antes de subirlo a Drive.`;
+        errEl.textContent = `${warnings[0]}. Puedes continuar al resumen; este archivo no se enviará a IA por peso, pero deberás subir otro archivo menor a 5 MB.`;
         errEl.style.display = "block";
-        showSectionValidationToast("Archivo pesado", "No bloquearemos el resumen. Los archivos mayores a 5 MB se marcarán como no validados por peso y se comprimirán al guardar.", {
+        showSectionValidationToast("Archivo pesado", "No bloquearemos el resumen. Los archivos mayores a 5 MB se marcarán como no validados por peso.", {
           type: "warning",
           autoCloseMs: 6500
         });
@@ -2839,86 +2829,7 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
 
     document.getElementById("review-finish-btn")?.addEventListener("click", saveRegistrationAndGenerateCredential);
 
-    async function compressAndValidateHeavyFile(field) {
-      const input = document.querySelector(`input[type="file"][name="${CSS.escape(field)}"]`);
-      const file = (input?.files || [])[0];
-
-      if (!file) {
-        showSectionValidationToast("Archivo no disponible", "Vuelve a seleccionar el archivo para poder comprimirlo y validarlo.", {
-          type: "warning",
-          autoCloseMs: 5600
-        });
-        if (input) {
-          const step = input.closest(".step")?.dataset?.step;
-          if (step) showStep(Number(step));
-          setTimeout(() => input.click(), 250);
-        }
-        return;
-      }
-
-      const fd = new FormData();
-      fd.set("jobId", globalJobId);
-      fd.set("fieldName", field);
-      fd.set("document", file);
-      fd.set("nombre", normalizeNameForValidation(document.getElementById("nombre").value || "").trim());
-      fd.set("tipo_vacante", selectedVacancy() || "driver");
-
-      showSectionValidationToast("Comprimiendo archivo", "Estamos reduciendo el peso del archivo para intentar validarlo con IA.", {
-        type: "loading"
-      });
-
-      try {
-        const resp = await fetch("/api/registration/compress-and-validate-document", {
-          method: "POST",
-          body: fd,
-          cache: "no-store"
-        });
-
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok || !data.ok) {
-          throw new Error(data.error || `Error al comprimir/validar (HTTP ${resp.status})`);
-        }
-
-        latestReviewPayload = {
-          ...(latestReviewPayload || {}),
-          summary: data.summary,
-          results: data.results,
-        };
-
-        renderReviewSummary(latestReviewPayload);
-
-        if (data.canValidate) {
-          showSectionValidationToast("Archivo validado", "El archivo fue comprimido y validado correctamente.", {
-            type: "success",
-            autoCloseMs: 3200
-          });
-        } else if (data.compressed) {
-          showSectionValidationToast("Archivo comprimido", data.message || "Se intentó comprimir, pero aún excede 5 MB. Sube otro archivo con menor peso.", {
-            type: "warning",
-            autoCloseMs: 7000
-          });
-        } else {
-          showSectionValidationToast("No se pudo comprimir", data.message || "El archivo sigue pendiente de revisión.", {
-            type: "warning",
-            autoCloseMs: 7000
-          });
-        }
-      } catch (err) {
-        const msg = friendlyErrorMessage(err, "No fue posible comprimir y validar el archivo.");
-        showSectionValidationToast("No se pudo procesar", msg, {
-          type: "error",
-          autoCloseMs: 7000
-        });
-      }
-    }
-
     document.getElementById("review-list")?.addEventListener("click", async (e) => {
-      const compressBtn = e.target.closest(".review-compress-btn");
-      if (compressBtn) {
-        await compressAndValidateHeavyFile(compressBtn.dataset.field);
-        return;
-      }
-
       const btn = e.target.closest(".review-replace-btn");
       if (!btn) return;
       const field = btn.dataset.field;
