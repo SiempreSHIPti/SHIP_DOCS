@@ -1,3 +1,63 @@
+# Fix compresión Python sin Ghostscript
+
+Se agregó compresión con script Python para imágenes/PDF y se eliminó dependencia de Ghostscript. Ver `README-FIX-COMPRESION-PYTHON-SIN-GHOSTSCRIPT.md`.
+
+---
+
+# Fix Driver opcionales y bloqueo de estado de cuenta
+
+Se ajustaron reglas de Driver/Chofer y el bloqueo de documentos requeridos no validados por peso. Ver `README-FIX-DRIVER-OPCIONALES-Y-BLOQUEO-ESTADO-CUENTA.md`.
+
+---
+
+# Fix reglas Driver/Chofer opcionales
+
+Se ajustaron las reglas documentales para Driver y Chofer: póliza/tarjeta no se solicitan y acta es opcional para Driver. Ver `README-FIX-REGLAS-DRIVER-CHOFER-OPCIONALES.md`.
+
+---
+
+# Fix UX archivo pesado no faltante
+
+Se ajustó el resumen para que un archivo cargado pero pesado no aparezca como faltante; ahora se muestra como archivo cargado no validado por peso. Ver `README-FIX-UX-ARCHIVO-PESADO-NO-FALTA.md`.
+
+---
+
+# Fix Ver resumen y feedback de compresión
+
+Se cambió el botón final a Ver resumen, se agrega modal de espera si hay validaciones pendientes y se mejora el mensaje cuando la compresión no alcanza 5 MB. Ver `README-FIX-VER-RESUMEN-Y-FEEDBACK-COMPRESION.md`.
+
+---
+
+# Fix comprimir y validar archivo pesado
+
+Se agregó acción en resumen para comprimir y validar archivos mayores a 5 MB sin bloquear el flujo. Ver `README-FIX-COMPRIMIR-Y-VALIDAR-ARCHIVO-PESADO.md`.
+
+---
+
+# Fix archivo pesado no bloquea IA
+
+Se ajustó el flujo para que archivos mayores a 5 MB no bloqueen el resumen: se omiten de IA, se marcan en resumen y se mantiene compresión al guardar. Ver `README-FIX-ARCHIVO-PESADO-NO-BLOQUEA-IA.md`.
+
+---
+
+# Fix 5 MB sin bloquear validación
+
+Se mantiene 5 MB como objetivo/recomendación, pero archivos mayores no bloquean validación/resumen y se comprimen al guardar. Ver `README-FIX-5MB-NO-BLOQUEAR-VALIDACION-COMPRESION.md`.
+
+---
+
+# Fix no bloquear resumen por archivos pesados
+
+Se ajustó el flujo para permitir llegar al resumen aunque existan archivos pesados, mostrando advertencia no bloqueante. Ver `README-FIX-NO-BLOQUEAR-RESUMEN-ARCHIVOS-PESADOS.md`.
+
+---
+
+# Fix archivos grandes y compresión Drive
+
+Se permite subir archivos de hasta 25 MB y se comprimen imágenes/PDFs antes de subir a Drive. Ver `README-FIX-ARCHIVOS-GRANDES-COMPRESION-DRIVE.md`.
+
+---
+
 # Fix progreso renumerado para Ayudante
 
 Se ajustó el progreso para que Referencias se vea como paso 3 cuando Vehículo no aplica. Ver `README-FIX-PROGRESO-RENUMERADO-AYUDANTE.md`.

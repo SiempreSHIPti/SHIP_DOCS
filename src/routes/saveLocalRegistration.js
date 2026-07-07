@@ -53,7 +53,7 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
   if (!finalReview.summary.canContinue) {
     return res.status(422).json({
       ok: false,
-      error: "No se puede guardar como completo porque existen documentos faltantes o rechazados por IA.",
+      error: "No se puede guardar como completo porque existen documentos faltantes, rechazados o pendientes de validar.",
       summary: finalReview.summary,
       validationErrors: job.validationErrors || [],
     });

@@ -9,11 +9,11 @@ function toInt(val, fallback) {
 }
 
 // Defaults seguros
-const MAX_FILE_MB = toInt(process.env.MAX_FILE_MB, 12);       // por archivo
+const MAX_FILE_MB = toInt(process.env.MAX_FILE_MB, 50);       // límite técnico de recepción; objetivo Drive: 5 MB tras compresión
 const MAX_FILES = toInt(process.env.MAX_FILES, 12);           // cantidad de archivos
 const MAX_FIELDS = toInt(process.env.MAX_FIELDS, 120);        // campos texto
 const MAX_FIELD_SIZE_KB = toInt(process.env.MAX_FIELD_SIZE_KB, 256); // tamaño campo texto
-const MAX_TOTAL_FILES_MB = toInt(process.env.MAX_TOTAL_FILES_MB, 70); // total por request
+const MAX_TOTAL_FILES_MB = toInt(process.env.MAX_TOTAL_FILES_MB, 150); // límite técnico de recepción; se comprime al guardar
 
 const ALLOWED_MIME = new Set([
   "application/pdf",

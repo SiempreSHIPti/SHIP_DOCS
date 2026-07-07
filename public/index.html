@@ -518,7 +518,7 @@
         <ul class="info-list">
           <li>Documentos completamente legibles y actuales</li>
           <li>Formatos permitidos: PDF, JPG, PNG</li>
-          <li><strong>Límites:</strong> 5&nbsp;MB por archivo, 40&nbsp;MB en total</li>
+          <li><strong>Límites:</strong> 5&nbsp;MB por archivo recomendado; archivos mayores se comprimen al guardar</li>
           <li>Información consistente en todos los documentos</li>
           <li>Revisión IA al finalizar con resumen claro de correcciones</li><li>Puede recuperar un avance previo usando CURP</li>
         </ul>
@@ -719,7 +719,7 @@
                   d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
                   clip-rule="evenodd" />
               </svg>
-              Suba documentos oficiales en PDF/JPG/PNG (máx. 5&nbsp;MB por archivo, 40&nbsp;MB total)
+              Suba documentos oficiales en PDF/JPG/PNG (recomendado 5&nbsp;MB por archivo; archivos mayores se comprimen al guardar)
             </p>
 
             <div class="grid">
@@ -963,15 +963,15 @@
 
             <div class="nav-buttons">
               <button type="button" class="btn-secondary" id="back-4">← Anterior</button>
-              <button id="submitBtn" type="submit"><span id="btn-text">Revisar documentos con IA</span><span id="btn-spinner"
+              <button id="submitBtn" type="submit"><span id="btn-text">Ver resumen</span><span id="btn-spinner"
                   class="loading" style="display:none;"></span></button>
             </div>
 
   
           <div class="review-loading-overlay" id="review-loading">
             <div class="review-loading-spinner"></div>
-            <h3>Validando documentos con IA…</h3>
-            <p>Estamos revisando legibilidad, tipo de documento y coincidencia con el nombre capturado.</p>
+            <h3>Preparando resumen…</h3>
+            <p>Estamos esperando validaciones pendientes y preparando el resumen documental.</p>
           </div>
 
           <div class="review-screen" id="ai-review-screen" aria-live="polite">
@@ -1098,19 +1098,31 @@
     function isFieldVisibleInSummary(row = {}) {
       const fieldName = row.fieldName;
       const vacancy = selectedVacancy() || "driver";
+      const status = statusForRow(row);
+      const hasUploadedFile = !!(row.fileName || row.validatedAt);
+
+      if (vacancy === "driver" && ["tarjeta", "poliza", "acta"].includes(fieldName)) {
+        return hasUploadedFile && status !== "skipped" && status !== "missing";
+      }
 
       if (!["licencia", "tarjeta", "poliza"].includes(fieldName)) return true;
       if (vacancy === "ayudante") return false;
       if (vacancy === "chofer" && (fieldName === "tarjeta" || fieldName === "poliza")) {
-        const status = statusForRow(row);
-        const hasUploadedFile = !!(row.fileName || row.validatedAt);
-        return hasUploadedFile && status !== "skipped" && status !== "missing";
+        return false;
       }
       return true;
     }
 
     function visibleReviewRows(rows = []) {
       return (rows || []).filter(isFieldVisibleInSummary);
+    }
+
+    function isOptionalNonBlockingField(fieldName) {
+      const vacancy = selectedVacancy() || "driver";
+      if (vacancy === "driver" && ["tarjeta", "poliza", "acta"].includes(fieldName)) return true;
+      if (vacancy === "chofer" && ["tarjeta", "poliza"].includes(fieldName)) return true;
+      if (vacancy === "ayudante" && ["licencia", "tarjeta", "poliza"].includes(fieldName)) return true;
+      return false;
     }
 
     function summarizeRowsForUi(rows = []) {
@@ -1120,7 +1132,10 @@
       const skipped = visible.filter((x) => x.status === "skipped").length;
       const rejected = visible.filter((x) => x.ok === false && x.status === "rejected").length;
       const missing = visible.filter((x) => x.status === "missing").length;
-      const pendingFix = rejected + missing;
+      const blockingWarnings = visible.filter((x) =>
+        (x.blocking === true || x.skippedByWeight === true) && !isOptionalNonBlockingField(x.fieldName)
+      ).length;
+      const pendingFix = rejected + missing + blockingWarnings;
       return {
         total: visible.length,
         approved,
@@ -1128,6 +1143,7 @@
         skipped,
         rejected,
         missing,
+        blockingWarnings,
         pendingFix,
         canContinue: pendingFix === 0,
       };
@@ -1177,9 +1193,9 @@
       }
 
       if (vacancy === "driver") {
-        notice.textContent = "Vacante Driver: licencia, tarjeta de circulación y póliza son obligatorias.";
+        notice.textContent = "Vacante Driver: licencia obligatoria. Tarjeta de circulación y póliza son opcionales; si las subes, se revisarán.";
       } else if (vacancy === "chofer") {
-        notice.textContent = "Vacante Chofer: sólo se solicitará licencia de conducir.";
+        notice.textContent = "Vacante Chofer: sólo se solicitará licencia de conducir. No se solicita tarjeta de circulación ni póliza.";
       } else if (vacancy === "ayudante") {
         notice.textContent = "Vacante Ayudante: el paso vehicular no aplica.";
       } else {
@@ -1226,16 +1242,19 @@
       if (vacancyInput) vacancyInput.value = vacancy;
 
       const showLicencia = vacancy === "driver" || vacancy === "chofer";
-      const showTarjeta = vacancy === "driver";
-      const showPoliza = vacancy === "driver";
+      const showTarjeta = vacancy === "driver"; // Driver: se solicita, pero es opcional.
+      const showPoliza = vacancy === "driver"; // Driver: se solicita, pero es opcional.
+      const showActa = vacancy !== "driver"; // Driver: acta opcional/no solicitada.
 
       setFieldVisibility("licencia", showLicencia);
       setFieldVisibility("tarjeta", showTarjeta);
       setFieldVisibility("poliza", showPoliza);
+      setFieldVisibility("acta", showActa);
 
       setRequiredMark("licencia", showLicencia);
-      setRequiredMark("tarjeta", showTarjeta);
-      setRequiredMark("poliza", showPoliza);
+      setRequiredMark("tarjeta", false);
+      setRequiredMark("poliza", false);
+      setRequiredMark("acta", showActa);
 
       updateVehicleHelpText(vacancy);
 
@@ -1264,6 +1283,7 @@
     const stepValidationPending = { 1: false, 2: false, 3: false, 4: false };
     const stepValidationPromises = {};
     const partialValidationByField = {};
+    const AI_VALIDATION_MAX_FILE_BYTES = 5 * 1024 * 1024;
     const fieldsPendingTargetedRevalidation = new Set();
 
     function currentStepNumber() {
@@ -1328,17 +1348,29 @@
       return promise;
     }
 
-    async function waitForPendingSectionValidations() {
-      const pending = [1, 2, 3]
+    function pendingValidationSteps() {
+      return [1, 2, 3]
         .filter((step) => !(step === 3 && !isVehicleStepRequired()))
-        .filter((step) => stepValidationPending[step] && stepValidationPromises[step])
-        .map((step) => stepValidationPromises[step]);
+        .filter((step) => stepValidationPending[step] && stepValidationPromises[step]);
+    }
+
+    async function waitForPendingSectionValidations(options = {}) {
+      const steps = pendingValidationSteps();
+      const pending = steps.map((step) => stepValidationPromises[step]);
 
       if (!pending.length) return;
 
-      showSectionValidationToast("Terminando validaciones", "Espera un momento. Estamos cerrando las validaciones pendientes antes del resumen.", {
-        type: "loading"
-      });
+      if (options.modal) {
+        showAppModal(
+          "Validaciones en curso",
+          `Estamos terminando ${pending.length} validación${pending.length === 1 ? "" : "es"} pendiente${pending.length === 1 ? "" : "s"} antes de mostrar el resumen.`,
+          { type: "loading" }
+        );
+      } else {
+        showSectionValidationToast("Terminando validaciones", "Espera un momento. Estamos cerrando las validaciones pendientes antes del resumen.", {
+          type: "loading"
+        });
+      }
 
       await Promise.allSettled(pending);
     }
@@ -1570,7 +1602,7 @@
 
       setBusyReview(true);
       if (!options.silentLoading) {
-        showAppModal("Preparando resumen", "Estamos armando el resumen final con las validaciones de cada paso.", { type: "loading" });
+        showAppModal("Preparando resumen", "Estamos consolidando los resultados ya obtenidos. No se ejecutará una validación completa nuevamente.", { type: "loading" });
       }
       errEl.style.display = "none";
       errEl.textContent = "";
@@ -1721,8 +1753,60 @@
       return text.length > 180 ? `${text.slice(0, 177)}...` : text;
     }
 
+    function formatMbFromBytes(bytes) {
+      const n = Number(bytes || 0);
+      if (!n) return "";
+      return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function heavySelectedFileInfo(fieldName) {
+      const input = document.querySelector(`input[type="file"][name="${CSS.escape(fieldName)}"]`);
+      const file = (input?.files || [])[0];
+      if (!file) return null;
+      if ((file.size || 0) <= AI_VALIDATION_MAX_FILE_BYTES) return null;
+      return {
+        fileName: file.name,
+        size: file.size || 0,
+      };
+    }
+
+    function enrichRowWithHeavyFileState(row = {}) {
+      if (row?.skippedByWeight) return row;
+
+      const info = heavySelectedFileInfo(row.fieldName);
+      if (!info) return row;
+
+      const status = statusForRow(row);
+      if (status !== "missing" && status !== "rejected") return row;
+
+      return {
+        ...row,
+        ok: true,
+        status: "warning",
+        severity: "warning",
+        recommendation: "manual_review",
+        fileName: info.fileName || row.fileName,
+        warnings: [`Archivo cargado, pero no se validó con IA porque excede 5 MB (${formatMbFromBytes(info.size)}).`],
+        summary: "Archivo cargado, pero no validado por peso. Puedes intentar comprimirlo y validarlo, o subir otro archivo más ligero.",
+        skippedByWeight: true,
+        clientHeavyFileFallback: true,
+      };
+    }
+
     function friendlyDetailForRow(row) {
       const status = statusForRow(row);
+
+      if (row?.skippedByWeight && row?.compressionAttempted && row?.compressionSufficient === false) {
+        const before = formatMbFromBytes(row.originalSize);
+        const after = formatMbFromBytes(row.compressedSize);
+        return `Se intentó reducir su tamaño${before && after ? ` de ${before} a ${after}` : ""}, pero aún supera 5 MB. Sube otro archivo con menor peso.`;
+      }
+
+      if (row?.skippedByWeight) {
+        const fileName = row.fileName ? `Archivo cargado: ${row.fileName}. ` : "";
+        return `${fileName}No se validó con IA porque excede 5 MB. Este documento requiere validación para guardar el registro final. Puedes intentar comprimirlo y validarlo, o subir otro archivo más ligero.`;
+      }
+
       if (status === "approved") return "Listo. Documento correcto.";
       if (status === "skipped") return "Opcional. No bloquea el registro.";
       if (status === "missing") return "Falta subir este documento.";
@@ -1773,7 +1857,7 @@
       const loading = document.getElementById("review-loading");
       if (loading) loading.classList.toggle("active", Boolean(isBusy));
       submitBtn.disabled = Boolean(isBusy);
-      btnText.textContent = isBusy ? "Validando con IA..." : "Revisar documentos con IA";
+      btnText.textContent = isBusy ? "Preparando resumen..." : "Ver resumen";
       btnSpinner.style.display = isBusy ? "inline-block" : "none";
     }
 
@@ -1808,7 +1892,28 @@
     }
 
     function buildFinalReviewFormData() {
-      const fd = new FormData(document.getElementById("document-form"));
+      const form = document.getElementById("document-form");
+      const fd = new FormData(form);
+      const heavyFiles = [];
+
+      for (const input of form.querySelectorAll('input[type="file"][name]')) {
+        const file = (input.files || [])[0];
+        if (!file) continue;
+
+        if ((file.size || 0) > AI_VALIDATION_MAX_FILE_BYTES) {
+          fd.delete(input.name);
+          heavyFiles.push({
+            fieldName: input.name,
+            fileName: file.name,
+            size: file.size || 0
+          });
+        }
+      }
+
+      if (heavyFiles.length) {
+        fd.set("aiSkippedHeavyFiles", JSON.stringify(heavyFiles));
+      }
+
       fd.set("jobId", globalJobId);
       const nombreNormalizado = normalizeNameForValidation(document.getElementById("nombre").value || "").trim();
       fd.set("nombre", nombreNormalizado);
@@ -1863,8 +1968,13 @@
       const screen = document.getElementById("ai-review-screen");
       const list = document.getElementById("review-list");
       const alert = document.getElementById("review-alert");
-      const rows = visibleReviewRows(payload.results || []);
-      const summary = summarizeRowsForUi(rows);
+      const rows = visibleReviewRows(payload.results || []).map(enrichRowWithHeavyFileState);
+      latestReviewPayload = {
+        ...(latestReviewPayload || {}),
+        results: rows,
+        summary: summarizeRowsForUi(rows),
+      };
+      const summary = latestReviewPayload.summary;
 
       document.getElementById("review-score-number").textContent = `${summary.approved || 0}/${Math.max((summary.total || rows.length) - (summary.skipped || 0), 0)}`;
       document.getElementById("stat-approved").textContent = summary.approved || 0;
@@ -1897,8 +2007,13 @@
       list.innerHTML = rows.map((row) => {
         const status = statusForRow(row);
         const label = row.label || DOC_LABELS[row.fieldName] || row.fieldName;
-        const canReplace = status === "rejected" || status === "missing" || status === "warning";
+        const canCompress = !!row.skippedByWeight;
+        const canReplace = !row.skippedByWeight && (status === "rejected" || status === "missing" || status === "warning");
+        const canUploadLighter = !!row.skippedByWeight;
         const fileName = row.fileName ? `<div class="review-item-file">Archivo revisado: ${row.fileName}</div>` : "";
+        const compressionInfo = row.compressionAttempted
+          ? `<div class="review-item-file">Compresión: ${formatMbFromBytes(row.originalSize) || "tamaño original"} → ${formatMbFromBytes(row.compressedSize) || "tamaño comprimido"}</div>`
+          : "";
         const model = "";
         const owner = row.ownerCheckApplies
           ? `<div class="review-item-file">Titular/propietario: ${row.nameFound || "No detectado"} · ${row.ownerMatchesDriver ? "Coincide con driver" : "Observación"}</div>`
@@ -1911,10 +2026,15 @@
               <div class="review-item-title">${label}</div>
               <div class="review-item-detail">${friendlyDetailForRow(row)}</div>
               ${fileName}
+              ${compressionInfo}
               ${owner}
               ${model}
             </div>
-            ${canReplace ? `<button type="button" class="review-replace-btn" data-field="${row.fieldName}">${status === "warning" ? "Cambiar archivo" : "Reemplazar archivo"}</button>` : ""}
+            <div class="review-item-actions">
+              ${canCompress ? `<button type="button" class="review-compress-btn" data-field="${row.fieldName}">Comprimir y validar</button>` : ""}
+              ${canUploadLighter ? `<button type="button" class="review-replace-btn" data-field="${row.fieldName}">Subir otro archivo</button>` : ""}
+              ${canReplace ? `<button type="button" class="review-replace-btn" data-field="${row.fieldName}">${status === "warning" ? "Cambiar archivo" : "Reemplazar archivo"}</button>` : ""}
+            </div>
           </div>
         `;
       }).join("");
@@ -2427,24 +2547,32 @@
     }
 
     function validateFileSizes() {
-      const maxFile = 5 * 1024 * 1024;
-      const maxTotal = 40 * 1024 * 1024;
+      const recommendedFile = 5 * 1024 * 1024;
+      const practicalTotal = 150 * 1024 * 1024;
       let total = 0;
+      const warnings = [];
 
       for (const input of document.querySelectorAll('input[type="file"]')) {
         const file = (input.files || [])[0];
         if (!file) continue;
 
         total += file.size || 0;
-        if ((file.size || 0) > maxFile) {
-          return markInvalid(input, `El archivo ${file.name} excede 5 MB.`);
+        if ((file.size || 0) > recommendedFile) {
+          warnings.push(`${file.name} supera 5 MB`);
         }
       }
 
-      if (total > maxTotal) {
-        errEl.textContent = "El total de archivos supera 40 MB.";
+      if (total > practicalTotal) {
+        warnings.push("El total de archivos es muy alto");
+      }
+
+      if (warnings.length) {
+        errEl.textContent = `${warnings[0]}. Puedes continuar al resumen; este archivo no se enviará a IA por peso, pero al guardar intentaremos comprimirlo antes de subirlo a Drive.`;
         errEl.style.display = "block";
-        return false;
+        showSectionValidationToast("Archivo pesado", "No bloquearemos el resumen. Los archivos mayores a 5 MB se marcarán como no validados por peso y se comprimirán al guardar.", {
+          type: "warning",
+          autoCloseMs: 6500
+        });
       }
 
       return true;
@@ -2540,8 +2668,6 @@
     function validateStep3() {
       const vacancy = selectedVacancy() || "driver";
       const licencia = document.getElementById("licencia");
-      const tarjeta = document.getElementById("tarjeta");
-      const poliza = document.getElementById("poliza");
 
       if (vacancy === "ayudante") {
         return true;
@@ -2549,11 +2675,6 @@
 
       if ((vacancy === "driver" || vacancy === "chofer") && !licencia?.files?.length && !loadedDraftCurp) {
         return markInvalid(licencia, "Debe cargar licencia de conducir.");
-      }
-
-      if (vacancy === "driver") {
-        if (!tarjeta?.files?.length && !loadedDraftCurp) return markInvalid(tarjeta, "Debe cargar tarjeta de circulación.");
-        if (!poliza?.files?.length && !loadedDraftCurp) return markInvalid(poliza, "Debe cargar póliza de seguro vehicular.");
       }
 
       return true;
@@ -2629,7 +2750,7 @@
       if (!validateStep4()) return;
 
       setStepValidated(4, true);
-      await waitForPendingSectionValidations();
+      await waitForPendingSectionValidations({ modal: true });
 
       await finalizePartialReviews();
     });
@@ -2718,7 +2839,86 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
 
     document.getElementById("review-finish-btn")?.addEventListener("click", saveRegistrationAndGenerateCredential);
 
-    document.getElementById("review-list")?.addEventListener("click", (e) => {
+    async function compressAndValidateHeavyFile(field) {
+      const input = document.querySelector(`input[type="file"][name="${CSS.escape(field)}"]`);
+      const file = (input?.files || [])[0];
+
+      if (!file) {
+        showSectionValidationToast("Archivo no disponible", "Vuelve a seleccionar el archivo para poder comprimirlo y validarlo.", {
+          type: "warning",
+          autoCloseMs: 5600
+        });
+        if (input) {
+          const step = input.closest(".step")?.dataset?.step;
+          if (step) showStep(Number(step));
+          setTimeout(() => input.click(), 250);
+        }
+        return;
+      }
+
+      const fd = new FormData();
+      fd.set("jobId", globalJobId);
+      fd.set("fieldName", field);
+      fd.set("document", file);
+      fd.set("nombre", normalizeNameForValidation(document.getElementById("nombre").value || "").trim());
+      fd.set("tipo_vacante", selectedVacancy() || "driver");
+
+      showSectionValidationToast("Comprimiendo archivo", "Estamos reduciendo el peso del archivo para intentar validarlo con IA.", {
+        type: "loading"
+      });
+
+      try {
+        const resp = await fetch("/api/registration/compress-and-validate-document", {
+          method: "POST",
+          body: fd,
+          cache: "no-store"
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || `Error al comprimir/validar (HTTP ${resp.status})`);
+        }
+
+        latestReviewPayload = {
+          ...(latestReviewPayload || {}),
+          summary: data.summary,
+          results: data.results,
+        };
+
+        renderReviewSummary(latestReviewPayload);
+
+        if (data.canValidate) {
+          showSectionValidationToast("Archivo validado", "El archivo fue comprimido y validado correctamente.", {
+            type: "success",
+            autoCloseMs: 3200
+          });
+        } else if (data.compressed) {
+          showSectionValidationToast("Archivo comprimido", data.message || "Se intentó comprimir, pero aún excede 5 MB. Sube otro archivo con menor peso.", {
+            type: "warning",
+            autoCloseMs: 7000
+          });
+        } else {
+          showSectionValidationToast("No se pudo comprimir", data.message || "El archivo sigue pendiente de revisión.", {
+            type: "warning",
+            autoCloseMs: 7000
+          });
+        }
+      } catch (err) {
+        const msg = friendlyErrorMessage(err, "No fue posible comprimir y validar el archivo.");
+        showSectionValidationToast("No se pudo procesar", msg, {
+          type: "error",
+          autoCloseMs: 7000
+        });
+      }
+    }
+
+    document.getElementById("review-list")?.addEventListener("click", async (e) => {
+      const compressBtn = e.target.closest(".review-compress-btn");
+      if (compressBtn) {
+        await compressAndValidateHeavyFile(compressBtn.dataset.field);
+        return;
+      }
+
       const btn = e.target.closest(".review-replace-btn");
       if (!btn) return;
       const field = btn.dataset.field;

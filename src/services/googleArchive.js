@@ -1,10 +1,15 @@
 // src/services/googleArchive.js
 const fs = require("fs");
 const path = require("path");
+const { promisify } = require("util");
 const mime = require("mime-types");
 const sharp = require("sharp");
+const { execFile } = require("child_process");
 const { ENV, assertGoogleArchiveConfig } = require("../config/env");
 const { getClients } = require("../lib/google");
+
+const execFileAsync = promisify(execFile);
+const TARGET_DRIVE_FILE_BYTES = 5 * 1024 * 1024; // objetivo: no más de 5 MB por archivo en Drive cuando la compresión lo permita
 
 const GOOGLE_FILE_FIELDS = [
   ["selfie", "Foto personal"],
@@ -220,6 +225,75 @@ function isImageMime(mimeType) {
   return /^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(String(mimeType || ""));
 }
 
+function isPdfMime(mimeType, localPath) {
+  const mimeVal = String(mimeType || "").toLowerCase();
+  const ext = path.extname(String(localPath || "")).toLowerCase();
+  return mimeVal === "application/pdf" || ext === ".pdf";
+}
+
+function compressionScriptPath() {
+  return path.resolve(process.cwd(), "scripts", "compress_document.py");
+}
+
+async function compressPdfForDrive({ localPath, label }) {
+  const originalSize = fs.existsSync(localPath) ? fs.statSync(localPath).size : 0;
+  if (!originalSize) return null;
+
+  const tmpDir = path.join("/tmp", "ship-drive-optimized");
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  const tmpPath = path.join(
+    tmpDir,
+    `${Date.now()}_${Math.random().toString(16).slice(2)}_${String(label || "documento").replace(/[^a-z0-9]+/gi, "_")}.pdf`
+  );
+
+  try {
+    const { stdout } = await execFileAsync("python3", [
+      compressionScriptPath(),
+      localPath,
+      tmpPath,
+      "--mime",
+      "application/pdf",
+      "--target-bytes",
+      String(TARGET_DRIVE_FILE_BYTES),
+    ], {
+      timeout: 120000,
+      maxBuffer: 1024 * 1024,
+    });
+
+    let info = {};
+    try { info = JSON.parse(String(stdout || "{}")); } catch (_) {}
+
+    const optimizedSize = fs.existsSync(tmpPath) ? fs.statSync(tmpPath).size : 0;
+
+    if (!optimizedSize || optimizedSize >= originalSize) {
+      try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
+      return null;
+    }
+
+    if (optimizedSize > TARGET_DRIVE_FILE_BYTES) {
+      console.warn("[googleArchive] PDF comprimido con Python sigue sobre 5 MB; se sube comprimido por ser menor que el original.", {
+        originalSize,
+        optimizedSize,
+        info,
+      });
+    }
+
+    return {
+      localPath: tmpPath,
+      mimeType: "application/pdf",
+      temporary: true,
+      originalSize,
+      optimizedSize,
+    };
+  } catch (err) {
+    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
+    console.warn("[googleArchive] No se pudo comprimir PDF con Python; se sube original:", err?.message || err);
+    return null;
+  }
+}
+
+
 function extensionForUpload({ originalName, localPath, mimeType }) {
   if (isImageMime(mimeType)) return ".jpg";
   const ext = path.extname(originalName || localPath || "").toLowerCase();
@@ -240,6 +314,23 @@ async function prepareFileForDrive({ localPath, originalName, mimeType, label })
   const detectedMime = mimeType || mime.lookup(localPath) || "application/octet-stream";
   const originalExt = extensionForUpload({ originalName, localPath, mimeType: detectedMime });
   const driveName = columnFileName(label, originalExt);
+
+  if (isPdfMime(detectedMime, localPath)) {
+    const compressed = await compressPdfForDrive({ localPath, label });
+    if (compressed) {
+      return {
+        ...compressed,
+        name: columnFileName(label, ".pdf"),
+      };
+    }
+
+    return {
+      localPath,
+      name: driveName,
+      mimeType: detectedMime,
+      temporary: false,
+    };
+  }
 
   if (!isImageMime(detectedMime)) {
     return {
@@ -262,13 +353,13 @@ async function prepareFileForDrive({ localPath, originalName, mimeType, label })
     await sharp(localPath)
       .rotate()
       .resize({
-        width: 1800,
-        height: 1800,
+        width: 1400,
+        height: 1400,
         fit: "inside",
         withoutEnlargement: true,
       })
       .jpeg({
-        quality: 72,
+        quality: 60,
         mozjpeg: true,
       })
       .toFile(tmpPath);
@@ -285,6 +376,10 @@ async function prepareFileForDrive({ localPath, originalName, mimeType, label })
         mimeType: detectedMime,
         temporary: false,
       };
+    }
+
+    if (optimizedSize > TARGET_DRIVE_FILE_BYTES) {
+      console.warn("[googleArchive] Imagen comprimida sigue sobre 5 MB; se sube comprimida por ser menor que el original.");
     }
 
     return {

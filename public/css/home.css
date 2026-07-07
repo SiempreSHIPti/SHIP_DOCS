@@ -796,3 +796,47 @@ body.skip-vehicle-step .progress-step[data-step="4"] .progress-dot,
 .progress-step.visually-renumbered span::after {
   content: "";
 }
+
+
+
+/* ===== Acción: comprimir y validar archivo pesado ===== */
+.review-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.review-compress-btn {
+  border: 1px solid rgba(245, 158, 11, .55);
+  background: rgba(245, 158, 11, .12);
+  color: #fbbf24;
+  border-radius: 999px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.review-compress-btn:hover {
+  background: rgba(245, 158, 11, .22);
+  border-color: rgba(245, 158, 11, .75);
+}
+
+@media (max-width: 720px) {
+  .review-item-actions {
+    align-items: stretch;
+  }
+}
+
+
+
+/* ===== UX archivo pesado cargado ===== */
+.review-item.warning[data-field] .review-item-file {
+  word-break: break-word;
+}
+
+.review-item.warning .review-compress-btn + .review-replace-btn {
+  margin-top: 0;
+}

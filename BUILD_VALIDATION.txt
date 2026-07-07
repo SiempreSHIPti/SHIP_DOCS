@@ -19,6 +19,20 @@ STDOUT:
 STDERR:
 
 
+$ node --check src/middleware/upload.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
+$ node --check src/services/documentValidation.js
+exit=0
+STDOUT:
+
+STDERR:
+
+
 $ node --check src/routes/finalDocumentReview.js
 exit=0
 STDOUT:
@@ -61,15 +75,35 @@ STDOUT:
 STDERR:
 
 
+$ python3 -m py_compile scripts/compress_document.py
+exit=0
+STDOUT:
+
+STDERR:
+Spreadsheet runtime warmup failed during python startup
+Traceback (most recent call last):
+  File "/tmp/tmp.yTcnQsZYiA/artifact_tool_v2-2.8.4/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py", line 26, in warm_spreadsheet_runtime_on_startup
+  File "/tmp/tmp.yTcnQsZYiA/artifact_tool_v2-2.8.4/artifact_tool/spreadsheet_warmup.py", line 785, in warm_spreadsheet_runtime
+  File "/tmp/tmp.yTcnQsZYiA/artifact_tool_v2-2.8.4/artifact_tool/spreadsheet_warmup.py", line 720, in _warm_feature_flows
+  File "/tmp/tmp.yTcnQsZYiA/artifact_tool_v2-2.8.4/artifact_tool/spreadsheet_warmup.py", line 704, in _warm_collaboration_flows
+  File "/tmp/tmp.yTcnQsZYiA/artifact_tool_v2-2.8.4/artifact_tool/generated/interface/models.py", line 30820, in hydrate_crdt_from_proto
+  File "/tmp/tmp.yTcnQsZYiA/artifact_tool_v2-2.8.4/artifact_tool/rpc/remote.py", line 749, in __call__
+  File "/tmp/tmp.yTcnQsZYiA/artifact_tool_v2-2.8.4/artifact_tool/rpc/client.py", line 150, in call
+artifact_tool.rpc.client.RemoteError: hydrateCrdtFromProto requires an empty collaborative document.
+
+
 
 TEXT_CHECKS:
 {
-  "visual_step_number_helper": true,
-  "references_renumbered_to_3": true,
-  "dot_uses_visual_number": true,
-  "vehicle_step_still_hidden": true,
-  "connector_line_kept": true,
-  "vehicle_and_next_line_hidden": true,
-  "skip_logic_kept": true,
-  "hide_non_required_fields_kept": true
+  "python_script_exists": true,
+  "requirements_added": true,
+  "docker_python_venv": true,
+  "docker_no_ghostscript_install": true,
+  "final_route_uses_python": true,
+  "final_route_no_gs_call": true,
+  "google_archive_uses_python_pdf": true,
+  "google_archive_no_gs_call": true,
+  "button_kept": true,
+  "shows_initial_final_size": true,
+  "blocks_final_required_heavy": true
 }
