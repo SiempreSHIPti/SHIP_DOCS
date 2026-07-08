@@ -1,3 +1,9 @@
+# Fix botones inicio toggle
+
+Se corrigió el comportamiento de Nuevo registro / Continuar registro para que sean mutuamente excluyentes y se puedan cerrar al segundo clic. Ver `README-FIX-BOTONES-INICIO-TOGGLE.md`.
+
+---
+
 # Fix archivo pesado en rojo sin compresión de usuario
 
 Se eliminó la herramienta de compresión para el usuario y se deja archivo pesado en rojo con instrucción de subir otro archivo menor a 5 MB. Ver `README-FIX-SIN-COMPRESION-USUARIO-ARCHIVO-PESADO-ROJO.md`.

@@ -71,14 +71,11 @@ STDERR:
 
 TEXT_CHECKS:
 {
-  "no_comprimir_validar_button": true,
-  "no_compress_endpoint_front": true,
-  "no_compress_endpoint_back": true,
-  "heavy_status_rejected_backend": true,
-  "heavy_status_rejected_frontend": true,
-  "heavy_copy_frontend": true,
-  "subir_otro_archivo_kept": true,
-  "no_python_dependency": true,
-  "no_python_script": true,
-  "pdf_drive_original": true
+  "acta_visible_always": true,
+  "acta_required_except_driver": true,
+  "validate_step2_excludes_acta_driver": true,
+  "acta_help_added": true,
+  "backend_acta_driver_optional": true,
+  "backend_summary_omits_if_not_uploaded": true,
+  "toggle_buttons_fix_preserved": true
 }

@@ -5,12 +5,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Portal de Documentos</title>
-  
+
   <link rel="icon" href="img/Icon.png" type="image/png">
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;700&family=Squada+One&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;500;700&family=Squada+One&display=swap"
+    rel="stylesheet">
   <link href="css/home.css" rel="stylesheet">
 
   <style>
@@ -24,13 +26,26 @@
       line-height: 1.35;
       border-radius: 10px;
       padding: 8px 10px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    .file-status.is-selected { color: var(--accent, #ef1235); }
-    .file-status.is-validating { color: #f59e0b; }
-    .file-status.is-ok { color: #10b981; }
-    .file-status.is-error { color: #ef4444; }
+
+    .file-status.is-selected {
+      color: var(--accent, #ef1235);
+    }
+
+    .file-status.is-validating {
+      color: #f59e0b;
+    }
+
+    .file-status.is-ok {
+      color: #10b981;
+    }
+
+    .file-status.is-error {
+      color: #ef4444;
+    }
+
     .file-status .mini-spinner {
       width: 14px;
       height: 14px;
@@ -42,18 +57,25 @@
       animation: fileSpin .8s linear infinite;
       margin-top: 1px;
     }
+
     .file-status .status-icon {
       flex: 0 0 auto;
       margin-top: 1px;
     }
+
     .file-status small {
       display: block;
       opacity: .9;
       font-weight: 500;
       margin-top: 2px;
     }
-    @keyframes fileSpin { to { transform: rotate(360deg); } }
-  
+
+    @keyframes fileSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     .recovered-file-control {
       display: flex;
       align-items: center;
@@ -67,34 +89,39 @@
       background: rgba(16, 185, 129, .10);
       border: 1px solid rgba(16, 185, 129, .35);
       color: #6ee7b7;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .03);
     }
+
     .recovered-file-control strong {
       display: block;
       color: #34d399;
       font-size: 13px;
       line-height: 1.15;
     }
+
     .recovered-file-control small {
       display: block;
-      color: rgba(255,255,255,.68);
+      color: rgba(255, 255, 255, .68);
       font-size: 11px;
       line-height: 1.2;
       margin-top: 2px;
     }
+
     .recovered-file-replace {
       border: 0;
       border-radius: 999px;
       padding: 9px 13px;
-      background: rgba(255,255,255,.12);
+      background: rgba(255, 255, 255, .12);
       color: #fff;
       font-weight: 900;
       cursor: pointer;
       white-space: nowrap;
     }
+
     .recovered-file-replace:hover {
-      background: rgba(255,255,255,.18);
+      background: rgba(255, 255, 255, .18);
     }
+
     input.file-input-has-draft {
       position: absolute !important;
       width: 1px !important;
@@ -103,77 +130,100 @@
       pointer-events: none !important;
       overflow: hidden !important;
     }
-
-</style>
+  </style>
 
 
   <style>
     .resume-actions-card {
       margin-bottom: 18px;
       padding: 18px;
-      border: 1px solid rgba(255,255,255,.10);
-      background: linear-gradient(135deg, rgba(248,0,32,.12), rgba(255,255,255,.035));
+      border: 1px solid rgba(255, 255, 255, .10);
+      background: linear-gradient(135deg, rgba(248, 0, 32, .12), rgba(255, 255, 255, .035));
       border-radius: 20px;
-      box-shadow: 0 20px 40px rgba(0,0,0,.12);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, .12);
     }
+
     .resume-actions-card h3 {
       margin: 0 0 6px;
       font-size: 20px;
       letter-spacing: .2px;
     }
+
     .resume-actions-card p {
       margin: 0 0 14px;
-      color: rgba(255,255,255,.72);
+      color: rgba(255, 255, 255, .72);
       font-size: 14px;
       line-height: 1.45;
     }
+
     .resume-actions-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
+
     .btn-outline-soft {
       width: 100%;
-      border: 1px solid rgba(255,255,255,.16);
-      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255, 255, 255, .16);
+      background: rgba(255, 255, 255, .06);
       color: #fff;
       border-radius: 14px;
       padding: 12px 14px;
       font-weight: 800;
       cursor: pointer;
     }
-    .btn-outline-soft:hover { background: rgba(255,255,255,.10); }
+
+    .btn-outline-soft:hover {
+      background: rgba(255, 255, 255, .10);
+    }
+
+    .btn-outline-soft.active {
+      background: rgba(248, 0, 32, .18);
+      border-color: rgba(248, 0, 32, .52);
+      box-shadow: 0 10px 28px rgba(248, 0, 32, .18);
+    }
+
     .resume-box {
       display: none;
       margin-top: 14px;
       padding: 14px;
       border-radius: 16px;
-      background: rgba(0,0,0,.26);
-      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0, 0, 0, .26);
+      border: 1px solid rgba(255, 255, 255, .10);
     }
-    .resume-box.active { display: block; }
+
+    .resume-box.active {
+      display: block;
+    }
+
     .resume-inline {
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 10px;
       align-items: end;
     }
+
     .resume-note {
       margin-top: 10px;
-      color: rgba(255,255,255,.68);
+      color: rgba(255, 255, 255, .68);
       font-size: 12px;
       line-height: 1.4;
     }
+
     .review-screen {
       display: none;
       margin-top: 18px;
       padding: 20px;
       border-radius: 24px;
       background: rgba(7, 10, 18, .96);
-      border: 1px solid rgba(255,255,255,.10);
-      box-shadow: 0 24px 70px rgba(0,0,0,.35);
+      border: 1px solid rgba(255, 255, 255, .10);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .35);
     }
-    .review-screen.active { display: block; }
+
+    .review-screen.active {
+      display: block;
+    }
+
     .review-hero {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -181,66 +231,77 @@
       align-items: center;
       margin-bottom: 18px;
     }
+
     .review-hero h2 {
       margin: 0;
       font-size: clamp(24px, 3vw, 34px);
     }
+
     .review-hero p {
       margin: 8px 0 0;
-      color: rgba(255,255,255,.72);
+      color: rgba(255, 255, 255, .72);
       line-height: 1.5;
     }
+
     .review-score {
       width: 120px;
       height: 120px;
       border-radius: 999px;
       display: grid;
       place-items: center;
-      background: radial-gradient(circle, rgba(16,185,129,.20), rgba(248,0,32,.12));
-      border: 1px solid rgba(255,255,255,.14);
+      background: radial-gradient(circle, rgba(16, 185, 129, .20), rgba(248, 0, 32, .12));
+      border: 1px solid rgba(255, 255, 255, .14);
       text-align: center;
       font-weight: 900;
     }
+
     .review-score strong {
       display: block;
       font-size: 28px;
       line-height: 1;
     }
+
     .review-score span {
       display: block;
       font-size: 11px;
       opacity: .75;
       margin-top: 4px;
     }
+
     .review-stats {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: 10px;
       margin-bottom: 16px;
     }
+
     .review-stat {
       padding: 12px;
       border-radius: 16px;
-      background: rgba(255,255,255,.055);
-      border: 1px solid rgba(255,255,255,.09);
+      background: rgba(255, 255, 255, .055);
+      border: 1px solid rgba(255, 255, 255, .09);
     }
+
     .review-stat small {
       display: block;
-      color: rgba(255,255,255,.66);
+      color: rgba(255, 255, 255, .66);
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: .6px;
     }
+
     .review-stat strong {
       display: block;
       margin-top: 4px;
       font-size: 22px;
     }
+
     .review-list {
       display: grid;
       gap: 10px;
       margin: 16px 0;
     }
+
     .review-item {
       display: grid;
       grid-template-columns: auto 1fr auto;
@@ -248,39 +309,61 @@
       align-items: center;
       padding: 14px;
       border-radius: 18px;
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(255, 255, 255, .10);
+      background: rgba(255, 255, 255, .045);
     }
-    .review-item.approved { border-color: rgba(16,185,129,.35); background: rgba(16,185,129,.08); }
-    .review-item.warning { border-color: rgba(245,158,11,.48); background: rgba(245,158,11,.10); }
-    .review-item.rejected, .review-item.missing { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); }
-    .review-item.skipped { border-color: rgba(148,163,184,.25); background: rgba(148,163,184,.08); }
+
+    .review-item.approved {
+      border-color: rgba(16, 185, 129, .35);
+      background: rgba(16, 185, 129, .08);
+    }
+
+    .review-item.warning {
+      border-color: rgba(245, 158, 11, .48);
+      background: rgba(245, 158, 11, .10);
+    }
+
+    .review-item.rejected,
+    .review-item.missing {
+      border-color: rgba(239, 68, 68, .35);
+      background: rgba(239, 68, 68, .08);
+    }
+
+    .review-item.skipped {
+      border-color: rgba(148, 163, 184, .25);
+      background: rgba(148, 163, 184, .08);
+    }
+
     .review-icon {
       width: 38px;
       height: 38px;
       border-radius: 12px;
       display: grid;
       place-items: center;
-      background: rgba(255,255,255,.08);
+      background: rgba(255, 255, 255, .08);
       font-size: 18px;
     }
+
     .review-item-title {
       font-weight: 900;
       margin-bottom: 3px;
     }
+
     .review-item-detail {
-      color: rgba(255,255,255,.70);
+      color: rgba(255, 255, 255, .70);
       font-size: 12px;
       line-height: 1.4;
     }
+
     .review-item-file {
-      color: rgba(255,255,255,.52);
+      color: rgba(255, 255, 255, .52);
       font-size: 11px;
       margin-top: 4px;
     }
+
     .review-replace-btn {
-      border: 1px solid rgba(255,255,255,.16);
-      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255, 255, 255, .16);
+      background: rgba(255, 255, 255, .08);
       color: #fff;
       border-radius: 12px;
       padding: 9px 12px;
@@ -288,124 +371,158 @@
       cursor: pointer;
       white-space: nowrap;
     }
-    .review-replace-btn:hover { background: rgba(255,255,255,.14); }
+
+    .review-replace-btn:hover {
+      background: rgba(255, 255, 255, .14);
+    }
+
     .review-actions {
       display: grid;
       grid-template-columns: 1.2fr 1fr 1fr;
       gap: 10px;
       margin-top: 16px;
     }
+
     .review-actions button {
       border-radius: 14px;
       padding: 13px 14px;
       font-weight: 900;
       cursor: pointer;
     }
+
     .btn-primary-review {
       border: none;
       background: linear-gradient(135deg, #f80020, #ff445c);
       color: #fff;
     }
+
     .btn-secondary-review {
-      border: 1px solid rgba(255,255,255,.16);
-      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255, 255, 255, .16);
+      background: rgba(255, 255, 255, .08);
       color: #fff;
     }
+
     .review-alert {
       padding: 13px 14px;
       border-radius: 16px;
-      border: 1px solid rgba(245,158,11,.25);
-      background: rgba(245,158,11,.10);
+      border: 1px solid rgba(245, 158, 11, .25);
+      background: rgba(245, 158, 11, .10);
       color: #fbbf24;
       font-size: 13px;
       line-height: 1.45;
       margin-top: 12px;
     }
+
     .draft-toast {
       display: none;
       margin-top: 14px;
       padding: 12px 14px;
       border-radius: 14px;
-      background: rgba(16,185,129,.12);
-      border: 1px solid rgba(16,185,129,.28);
+      background: rgba(16, 185, 129, .12);
+      border: 1px solid rgba(16, 185, 129, .28);
       color: #6ee7b7;
       font-weight: 800;
     }
-    .draft-toast.active { display: block; }
+
+    .draft-toast.active {
+      display: block;
+    }
 
     .archive-result {
       margin-top: 14px;
       padding: 14px;
       border-radius: 16px;
-      background: rgba(16,185,129,.10);
-      border: 1px solid rgba(16,185,129,.28);
+      background: rgba(16, 185, 129, .10);
+      border: 1px solid rgba(16, 185, 129, .28);
       color: #d1fae5;
       font-size: 13px;
       line-height: 1.45;
     }
+
     .archive-result a {
       color: #86efac;
       font-weight: 900;
       text-decoration: underline;
     }
-    
+
     .review-loading-overlay {
       display: none;
       padding: 24px;
       border-radius: 24px;
       margin-top: 18px;
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.36);
+      border: 1px solid rgba(255, 255, 255, .10);
+      background: rgba(0, 0, 0, .36);
       text-align: center;
     }
-    .review-loading-overlay.active { display: block; }
+
+    .review-loading-overlay.active {
+      display: block;
+    }
+
     .review-loading-spinner {
       width: 44px;
       height: 44px;
       margin: 0 auto 12px;
       border-radius: 999px;
-      border: 4px solid rgba(255,255,255,.18);
+      border: 4px solid rgba(255, 255, 255, .18);
       border-top-color: #f80020;
       animation: reviewSpin .8s linear infinite;
     }
-    @keyframes reviewSpin { to { transform: rotate(360deg); } }
+
+    @keyframes reviewSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     @media (max-width: 760px) {
-      .resume-actions-row, .resume-inline, .review-hero, .review-stats, .review-actions {
+
+      .resume-actions-row,
+      .resume-inline,
+      .review-hero,
+      .review-stats,
+      .review-actions {
         grid-template-columns: 1fr;
       }
+
       .review-score {
         width: 100%;
         height: auto;
         padding: 16px;
         border-radius: 18px;
       }
+
       .review-item {
         grid-template-columns: auto 1fr;
       }
+
       .review-replace-btn {
         grid-column: 1 / -1;
       }
     }
-  
+
     body.pre-registration .form-header,
     body.pre-registration #document-form,
     body.pre-registration .progress-container,
     body.pre-registration .left-panel {
       display: none !important;
     }
+
     body.pre-registration .form-container {
       width: min(720px, 100%);
       max-width: 720px;
       margin: 0 auto;
     }
+
     body.pre-registration .resume-actions-card {
       margin: 0;
     }
+
     body:not(.pre-registration) #resume-card {
       display: none !important;
     }
 
-  
+
     .app-modal-backdrop {
       position: fixed;
       inset: 0;
@@ -414,20 +531,25 @@
       align-items: center;
       justify-content: center;
       padding: 18px;
-      background: rgba(0,0,0,.72);
+      background: rgba(0, 0, 0, .72);
       backdrop-filter: blur(8px);
     }
-    .app-modal-backdrop.active { display: flex; }
+
+    .app-modal-backdrop.active {
+      display: flex;
+    }
+
     .app-modal-card {
       width: min(440px, 100%);
       border-radius: 24px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: linear-gradient(135deg, rgba(32,18,20,.96), rgba(10,10,12,.98));
+      border: 1px solid rgba(255, 255, 255, .14);
+      background: linear-gradient(135deg, rgba(32, 18, 20, .96), rgba(10, 10, 12, .98));
       color: #fff;
       padding: 22px;
-      box-shadow: 0 24px 80px rgba(0,0,0,.55);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .55);
       text-align: center;
     }
+
     .app-modal-icon {
       width: 56px;
       height: 56px;
@@ -435,44 +557,51 @@
       display: grid;
       place-items: center;
       margin: 0 auto 14px;
-      background: rgba(248,0,32,.18);
+      background: rgba(248, 0, 32, .18);
       color: #ff6474;
       font-size: 26px;
       font-weight: 900;
     }
+
     .app-modal-card.success .app-modal-icon {
-      background: rgba(16,185,129,.14);
+      background: rgba(16, 185, 129, .14);
       color: #6ee7b7;
     }
+
     .app-modal-card.error .app-modal-icon {
-      background: rgba(239,68,68,.14);
+      background: rgba(239, 68, 68, .14);
       color: #fca5a5;
     }
+
     .app-modal-spinner {
       width: 32px;
       height: 32px;
       border-radius: 999px;
-      border: 4px solid rgba(255,255,255,.22);
+      border: 4px solid rgba(255, 255, 255, .22);
       border-top-color: #f80020;
       animation: reviewSpin .8s linear infinite;
     }
+
     .app-modal-title {
       margin: 0 0 8px;
       font-size: 22px;
       line-height: 1.1;
     }
+
     .app-modal-message {
       margin: 0;
-      color: rgba(255,255,255,.76);
+      color: rgba(255, 255, 255, .76);
       line-height: 1.45;
       font-size: 14px;
     }
+
     .app-modal-actions {
       margin-top: 18px;
       display: flex;
       justify-content: center;
       gap: 10px;
     }
+
     .app-modal-button {
       border: 0;
       border-radius: 14px;
@@ -482,15 +611,21 @@
       font-weight: 900;
       cursor: pointer;
     }
+
     .maps-help {
       margin-top: 7px;
-      color: rgba(255,255,255,.62);
+      color: rgba(255, 255, 255, .62);
       font-size: 12px;
       line-height: 1.35;
     }
-    .maps-help.ok { color: #6ee7b7; }
-    .maps-help.warn { color: #fbbf24; }
 
+    .maps-help.ok {
+      color: #6ee7b7;
+    }
+
+    .maps-help.warn {
+      color: #fbbf24;
+    }
   </style>
 
 </head>
@@ -520,7 +655,8 @@
           <li>Formatos permitidos: PDF, JPG, PNG</li>
           <li><strong>Límites:</strong> 5&nbsp;MB por archivo recomendado; archivos mayores se comprimen al guardar</li>
           <li>Información consistente en todos los documentos</li>
-          <li>Revisión IA al finalizar con resumen claro de correcciones</li><li>Puede recuperar un avance previo usando CURP</li>
+          <li>Revisión IA al finalizar con resumen claro de correcciones</li>
+          <li>Puede recuperar un avance previo usando CURP</li>
         </ul>
       </div>
     </div>
@@ -675,7 +811,8 @@
                   <input type="hidden" id="direccion_place_id" name="direccion_place_id" />
                   <input type="hidden" id="direccion_lat" name="direccion_lat" />
                   <input type="hidden" id="direccion_lng" name="direccion_lng" />
-                  <div class="maps-help warn" id="maps-help">Busca tu dirección y selecciona una opción de Google Maps.</div>
+                  <div class="maps-help warn" id="maps-help">Busca tu dirección y selecciona una opción de Google Maps.
+                  </div>
                 </div>
               </div>
 
@@ -693,8 +830,10 @@
                             clip-rule="evenodd" />
                         </svg>Estado de cuenta bancario <span class="required">*</span></label>
                       <input type="hidden" id="clabe_mode" name="clabe_mode" value="archivo" />
-                      <input type="file" id="estado_cuenta" name="estado_cuenta" accept=".pdf,.jpg,.jpeg,.png" required />
-                      <div class="muted">Sube un estado de cuenta real y legible donde se observe la CLABE/datos bancarios.</div>
+                      <input type="file" id="estado_cuenta" name="estado_cuenta" accept=".pdf,.jpg,.jpeg,.png"
+                        required />
+                      <div class="muted">Sube un estado de cuenta real y legible donde se observe la CLABE/datos
+                        bancarios.</div>
                     </div>
                   </div>
                 </div>
@@ -719,7 +858,8 @@
                   d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
                   clip-rule="evenodd" />
               </svg>
-              Suba documentos oficiales en PDF/JPG/PNG (recomendado 5&nbsp;MB por archivo; archivos mayores se comprimen al guardar)
+              Suba documentos oficiales en PDF/JPG/PNG (recomendado 5&nbsp;MB por archivo; archivos mayores se comprimen
+              al guardar)
             </p>
 
             <div class="grid">
@@ -777,32 +917,19 @@
 
               <div class="col-12">
                 <div class="field-group">
-                  <div class="field-group-title"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd"
-                        d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 01-2-2h2zm4-3a1 1 0 00-1 1v1h2V4a1 1 0 00-1-1z"
+                  <label for="acta"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
                         clip-rule="evenodd" />
-                    </svg>Seguridad Social</div>
-                  <label>Número de Seguro Social <span class="required">*</span></label>
-                  <div class="nss-mode">
-                    <label><input type="radio" name="nss_mode" value="archivo" checked> Subir documento NSS</label>
-                    <label><input type="radio" name="nss_mode" value="numero"> Escribir número NSS</label>
-                  </div>
+                    </svg>Archivo de Seguro Social <span class="required">*</span></label>
+
                   <div class="grid">
                     <div class="col-6" id="nss_file_wrap">
-                      <label for="nss_file">Archivo NSS</label>
                       <input type="file" id="nss_file" name="nss_file" accept=".pdf,.jpg,.jpeg,.png" />
                       <a class="help-link"
                         href="https://serviciosdigitales.imss.gob.mx/gestionAsegurados-web-externo/asignacionNSS"
                         target="_blank" rel="noopener noreferrer">Consultar NSS →</a>
                     </div>
-                    <div class="col-6" id="nss_num_wrap" style="display:none;">
-                      <label for="nss_num">Número NSS (11 dígitos)</label>
-                      <input type="text" id="nss_num" name="nss_num" inputmode="numeric" maxlength="11"
-                        placeholder="12345678901" disabled />
-                      <a class="help-link"
-                        href="https://serviciosdigitales.imss.gob.mx/gestionAsegurados-web-externo/asignacionNSS"
-                        target="_blank" rel="noopener noreferrer">Consultar NSS →</a>
-                    </div>
+
                   </div>
                 </div>
               </div>
@@ -967,49 +1094,50 @@
                   class="loading" style="display:none;"></span></button>
             </div>
 
-  
-          <div class="review-loading-overlay" id="review-loading">
-            <div class="review-loading-spinner"></div>
-            <h3>Preparando resumen…</h3>
-            <p>Estamos esperando validaciones pendientes y preparando el resumen documental.</p>
-          </div>
 
-          <div class="review-screen" id="ai-review-screen" aria-live="polite">
-            <div class="review-hero">
-              <div>
-                <h2 id="review-title">Resumen de revisión IA</h2>
-                <p id="review-subtitle">Aquí verás los documentos aprobados y los documentos que debes corregir.</p>
-              </div>
-              <div class="review-score">
+            <div class="review-loading-overlay" id="review-loading">
+              <div class="review-loading-spinner"></div>
+              <h3>Preparando resumen…</h3>
+              <p>Estamos esperando validaciones pendientes y preparando el resumen documental.</p>
+            </div>
+
+            <div class="review-screen" id="ai-review-screen" aria-live="polite">
+              <div class="review-hero">
                 <div>
-                  <strong id="review-score-number">0/0</strong>
-                  <span>Aprobados</span>
+                  <h2 id="review-title">Resumen de revisión IA</h2>
+                  <p id="review-subtitle">Aquí verás los documentos aprobados y los documentos que debes corregir.</p>
+                </div>
+                <div class="review-score">
+                  <div>
+                    <strong id="review-score-number">0/0</strong>
+                    <span>Aprobados</span>
+                  </div>
                 </div>
               </div>
+
+              <div class="review-stats">
+                <div class="review-stat"><small>Aprobados</small><strong id="stat-approved">0</strong></div>
+                <div class="review-stat"><small>Observación</small><strong id="stat-warning">0</strong></div>
+                <div class="review-stat"><small>Por corregir</small><strong id="stat-rejected">0</strong></div>
+                <div class="review-stat"><small>Faltantes</small><strong id="stat-missing">0</strong></div>
+                <div class="review-stat"><small>Omitidos</small><strong id="stat-skipped">0</strong></div>
+              </div>
+
+              <div id="review-alert" class="review-alert" style="display:none;"></div>
+              <div class="review-list" id="review-list"></div>
+
+              <div class="review-actions">
+                <button type="button" class="btn-primary-review" id="review-revalidate-btn">Validar archivos
+                  corregidos</button>
+                <button type="button" class="btn-secondary-review" id="save-draft-btn">Guardar avance</button>
+                <button type="button" class="btn-secondary-review" id="review-finish-btn">Guardar registro</button>
+              </div>
+              <div class="draft-toast" id="draft-toast"></div>
+              <div class="archive-result" id="archive-result" style="display:none;"></div>
             </div>
 
-            <div class="review-stats">
-              <div class="review-stat"><small>Aprobados</small><strong id="stat-approved">0</strong></div>
-              <div class="review-stat"><small>Observación</small><strong id="stat-warning">0</strong></div>
-              <div class="review-stat"><small>Por corregir</small><strong id="stat-rejected">0</strong></div>
-              <div class="review-stat"><small>Faltantes</small><strong id="stat-missing">0</strong></div>
-              <div class="review-stat"><small>Omitidos</small><strong id="stat-skipped">0</strong></div>
-            </div>
 
-            <div id="review-alert" class="review-alert" style="display:none;"></div>
-            <div class="review-list" id="review-list"></div>
-
-            <div class="review-actions">
-              <button type="button" class="btn-primary-review" id="review-revalidate-btn">Validar archivos corregidos</button>
-              <button type="button" class="btn-secondary-review" id="save-draft-btn">Guardar avance</button>
-              <button type="button" class="btn-secondary-review" id="review-finish-btn">Guardar registro</button>
-            </div>
-            <div class="draft-toast" id="draft-toast"></div>
-            <div class="archive-result" id="archive-result" style="display:none;"></div>
-          </div>
-
-
-          <div id="err" role="alert"></div>
+            <div id="err" role="alert"></div>
           </div>
         </form>
       </div>
@@ -1193,7 +1321,7 @@
       }
 
       if (vacancy === "driver") {
-        notice.textContent = "Vacante Driver: licencia obligatoria. Tarjeta de circulación y póliza son opcionales; si las subes, se revisarán.";
+        notice.textContent = "Vacante Driver: licencia obligatoria. Tarjeta de circulación, póliza y acta de nacimiento son opcionales; si las subes, se revisarán.";
       } else if (vacancy === "chofer") {
         notice.textContent = "Vacante Chofer: sólo se solicitará licencia de conducir. No se solicita tarjeta de circulación ni póliza.";
       } else if (vacancy === "ayudante") {
@@ -1210,7 +1338,7 @@
 
     function clearFileInput(input) {
       if (!input) return;
-      try { input.value = ""; } catch (_) {}
+      try { input.value = ""; } catch (_) { }
       clearRecoveredFileControl(input);
       const status = input.parentElement?.querySelector(".file-status");
       if (status) status.remove();
@@ -1244,7 +1372,7 @@
       const showLicencia = vacancy === "driver" || vacancy === "chofer";
       const showTarjeta = vacancy === "driver"; // Driver: se solicita, pero es opcional.
       const showPoliza = vacancy === "driver"; // Driver: se solicita, pero es opcional.
-      const showActa = vacancy !== "driver"; // Driver: acta opcional/no solicitada.
+      const showActa = true; // Driver: se muestra, pero es opcional.
 
       setFieldVisibility("licencia", showLicencia);
       setFieldVisibility("tarjeta", showTarjeta);
@@ -1254,9 +1382,18 @@
       setRequiredMark("licencia", showLicencia);
       setRequiredMark("tarjeta", false);
       setRequiredMark("poliza", false);
-      setRequiredMark("acta", showActa);
+      setRequiredMark("acta", vacancy !== "driver");
 
       updateVehicleHelpText(vacancy);
+
+      const actaHelp = document.getElementById("acta-help");
+      if (actaHelp) {
+        actaHelp.textContent = vacancy === "driver"
+          ? "Para Driver es opcional. Si la subes, se validará con IA."
+          : "Documento requerido para esta vacante.";
+      }
+
+
 
       document.querySelectorAll("[data-vacancy]").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.vacancy === vacancy);
@@ -2365,7 +2502,7 @@
       try {
         el.focus({ preventScroll: true });
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-      } catch (_) {}
+      } catch (_) { }
       return false;
     }
 
@@ -2489,7 +2626,7 @@
 
       try {
         document.querySelector(".right-panel")?.scrollTo({ top: 0, behavior: "smooth" });
-      } catch (_) {}
+      } catch (_) { }
     }
 
     function applyClabeMode(mode) {
@@ -2633,7 +2770,10 @@
     }
 
     function validateStep2() {
-      const requiredIds = ["ine_frontal", "ine_reverso", "curp", "acta", "comprobante", "constancia"];
+      const vacancy = selectedVacancy() || "driver";
+      const requiredIds = ["ine_frontal", "ine_reverso", "curp", "acta", "comprobante", "constancia"]
+        .filter((id) => !(vacancy === "driver" && id === "acta"));
+
       for (const id of requiredIds) {
         const el = document.getElementById(id);
         if (el && !el.disabled && !el.files?.length && !loadedDraftCurp) {
@@ -2749,7 +2889,7 @@
     applyNssMode(document.querySelector('input[name="nss_mode"]:checked')?.value || "archivo");
 
 
-    
+
     function resetForNextDriver() {
       hardResetForm();
       document.body.classList.add("pre-registration");
@@ -2763,7 +2903,7 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-function showRegistrationInterface() {
+    function showRegistrationInterface() {
       document.body.classList.remove("pre-registration");
       const resumeCard = document.getElementById("resume-card");
       if (resumeCard) resumeCard.style.display = "none";
@@ -2786,31 +2926,72 @@ function showRegistrationInterface() {
         }
       });
     });
-document.getElementById("resume-curp")?.addEventListener("input", (e) => {
+    document.getElementById("resume-curp")?.addEventListener("input", (e) => {
       e.target.value = normalizeCurp(e.target.value);
     });
 
-    document.getElementById("show-resume-btn")?.addEventListener("click", () => {
-      hardResetForm();
-      document.getElementById("resume-box")?.classList.toggle("active");
-      document.getElementById("resume-curp")?.focus();
-    });
+    function clearStartPanelMode() {
+      document.getElementById("vacancy-box")?.classList.remove("active");
+      document.getElementById("resume-box")?.classList.remove("active");
+      document.getElementById("new-registration-btn")?.classList.remove("active");
+      document.getElementById("show-resume-btn")?.classList.remove("active");
+    }
 
-    document.getElementById("new-registration-btn")?.addEventListener("click", () => {
+    function setStartPanelMode(mode) {
+      const vacancyBox = document.getElementById("vacancy-box");
+      const resumeBox = document.getElementById("resume-box");
+      const newBtn = document.getElementById("new-registration-btn");
+      const resumeBtn = document.getElementById("show-resume-btn");
+      const note = document.getElementById("resume-note");
+
+      const isNewOpen = vacancyBox?.classList.contains("active");
+      const isResumeOpen = resumeBox?.classList.contains("active");
+
       hardResetForm();
+      clearStartPanelMode();
       latestReviewPayload = null;
       loadedDraftCurp = "";
       document.getElementById("ai-review-screen")?.classList.remove("active");
-      const vacancyBox = document.getElementById("vacancy-box");
-      if (vacancyBox) vacancyBox.classList.add("active");
-      document.getElementById("resume-note").textContent = "Selecciona la vacante para aplicar los documentos obligatorios.";
+
+      if (mode === "new") {
+        if (isNewOpen) {
+          if (note) note.textContent = "Selecciona una opción para iniciar o recuperar tu registro.";
+          return;
+        }
+
+        vacancyBox?.classList.add("active");
+        newBtn?.classList.add("active");
+        if (note) note.textContent = "Selecciona la vacante para aplicar las reglas documentales.";
+        return;
+      }
+
+      if (mode === "resume") {
+        if (isResumeOpen) {
+          if (note) note.textContent = "Selecciona una opción para iniciar o recuperar tu registro.";
+          return;
+        }
+
+        resumeBox?.classList.add("active");
+        resumeBtn?.classList.add("active");
+        const curpInput = document.getElementById("resume-curp");
+        if (curpInput) setTimeout(() => curpInput.focus(), 50);
+        if (note) note.textContent = "Ingresa tu CURP para recuperar tu avance.";
+      }
+    }
+
+    document.getElementById("show-resume-btn")?.addEventListener("click", () => {
+      setStartPanelMode("resume");
+    });
+
+    document.getElementById("new-registration-btn")?.addEventListener("click", () => {
+      setStartPanelMode("new");
     });
 
     document.querySelectorAll("[data-vacancy]").forEach((btn) => {
       btn.addEventListener("click", () => {
         hardResetForm();
         const vacancy = applyVacancyRules(btn.dataset.vacancy);
-        document.getElementById("vacancy-box")?.classList.add("active");
+        clearStartPanelMode();
         showRegistrationInterface();
         showStep(1);
         showSuccess("Vacante seleccionada", `Aplicarás como ${VACANCY_LABELS[vacancy] || vacancy}.`);
@@ -2864,7 +3045,7 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
           }
           return;
         }
-        
+
         const script = document.createElement("script");
         script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=places&loading=async&callback=__gmapsReady`;
         script.async = true;
@@ -2891,7 +3072,7 @@ document.getElementById("resume-curp")?.addEventListener("input", (e) => {
         }
 
         const unpatchedWarn = console.warn;
-        console.warn = function(...args) {
+        console.warn = function (...args) {
           if (args[0] && typeof args[0] === 'string' && args[0].includes('google.maps.places.Autocomplete')) return;
           unpatchedWarn.apply(console, args);
         };
