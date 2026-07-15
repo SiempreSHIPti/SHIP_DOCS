@@ -230,12 +230,12 @@ function getDraftCredentialReadiness({ bodyData = {}, reviewPayload = {}, google
   const nombre = String(bodyData.nombre || "").trim();
   const nss = normalizeNssForSheet(bodyData.nssNum || bodyData.nss_num || extractNssFromReview(reviewPayload));
   const rfc = normalizeRfc(bodyData.rfc || extractRfcFromReview(reviewPayload));
-  const curpValue = normalizeCurpForLookup(bodyData.curpTxt || bodyData.curp_txt || curp);
+  const curpValue = normalizeCurpForLookup(bodyData.curpTxt) || normalizeCurpForLookup(bodyData.curp_txt) || normalizeCurpForLookup(curp);
   const selfieLink = googleFiles.selfie?.webViewLink || "";
 
   const missing = [];
   if (!nombre) missing.push("nombre");
-  if (curpValue.length !== 18) missing.push("curp");
+  if (!curpValue) missing.push("curp");
   if (!/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc)) missing.push("rfc");
   if (nss.length !== 11) missing.push("nss");
   if (!selfieLink) missing.push("foto");
@@ -302,8 +302,11 @@ function isEnabled() {
   return ENV.GOOGLE_ARCHIVE_ENABLED === true || ENV.GOOGLE_ARCHIVE_ENABLED === "true";
 }
 
+const CURP_REGEX = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
+
 function normalizeCurpForLookup(value) {
-  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 18);
+  const normalized = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 18);
+  return CURP_REGEX.test(normalized) ? normalized : "";
 }
 
 function safeName(value, fallback = "SIN_NOMBRE") {
@@ -697,7 +700,7 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
     asSheetText(clabe),
     asSheetText(nss),
     rfc,
-    bodyData.curpTxt || localResult.curp || "",
+    normalizeCurpForLookup(bodyData.curpTxt) || normalizeCurpForLookup(localResult.curp) || "",
     status,
     summary.approved || 0,
     documentNamesByStatus(reviewPayload, "rejected"),
@@ -956,7 +959,7 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
   const parentId = ENV.GOOGLE_DRIVE_PARENT_FOLDER_ID || ENV.DRIVE_PARENT_FOLDER_ID;
   const { drive, sheets, slides } = await getClients();
 
-  const curp = normalizeCurpForLookup(draftResult.curp || bodyData.curpTxt || "");
+  const curp = normalizeCurpForLookup(draftResult.curp) || normalizeCurpForLookup(bodyData.curpTxt || "");
   const folderName = `${safeName(bodyData.nombre)}_${safeName(curp || draftResult.jobId || "BORRADOR")}`;
   const driverFolder = await findOrCreateFolder(drive, {
     name: folderName,
@@ -1039,7 +1042,7 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
     driverFolder,
     bodyData: {
       ...bodyData,
-      curpTxt: bodyData.curpTxt || curp,
+      curpTxt: normalizeCurpForLookup(bodyData.curpTxt) || curp,
     },
     reviewPayload,
     rowStatus: "BORRADOR",
@@ -1131,7 +1134,7 @@ async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayloa
     reviewPayload,
   });
 
-  const curp = normalizeCurpForLookup(bodyData.curpTxt || localResult.curp || "");
+  const curp = normalizeCurpForLookup(bodyData.curpTxt) || normalizeCurpForLookup(localResult.curp || "");
   const sheetAppend = await upsertFinalSheetRow(sheets, { curp, row });
 
   return {

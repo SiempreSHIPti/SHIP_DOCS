@@ -265,7 +265,7 @@ function extractClabeFromReview(reviewPayload = {}) {
 function normalizeCurp(value) {
   const text = String(value || "").toUpperCase();
   const match = text.match(/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/);
-  return match ? match[0] : text.replace(/[^A-Z0-9]/g, "").slice(0, 18);
+  return match ? match[0] : "";
 }
 
 function normalizeRfc(value) {

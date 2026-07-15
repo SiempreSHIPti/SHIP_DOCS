@@ -2413,11 +2413,32 @@
 
 
 
+    const CURP_RE = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
+
     function normalizeDetectedCurp(value) {
       return String(value || "")
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
         .slice(0, 18);
+    }
+
+    function isValidDetectedCurp(value) {
+      return CURP_RE.test(normalizeDetectedCurp(value));
+    }
+
+    function reviewStatus(row) {
+      return String(row?.status || row?.state || "").toLowerCase().trim();
+    }
+
+    function isCurpReviewValidated(row) {
+      if (!row) return false;
+      const status = reviewStatus(row);
+      const severity = String(row?.severity || "").toLowerCase().trim();
+
+      if (row?.ok === false || severity === "error") return false;
+      if (["rejected", "missing", "invalid", "manual_review", "warning", "pending"].includes(status)) return false;
+      if (row?.ok === true) return true;
+      return ["approved", "ok", "valid", "validated", "success"].includes(status);
     }
 
     function findCurpInText(value) {
@@ -2428,7 +2449,9 @@
 
     function getCurpFromLatestReview() {
       const rows = latestReviewPayload?.results || [];
-      const curpRow = rows.find((row) => row.fieldName === "curp");
+      const curpRow = rows.find((row) => row?.fieldName === "curp");
+
+      if (!isCurpReviewValidated(curpRow)) return "";
 
       const candidates = [
         curpRow?.fields?.curp,
@@ -2440,10 +2463,10 @@
 
       for (const candidate of candidates) {
         const direct = normalizeDetectedCurp(candidate);
-        if (direct.length === 18) return direct;
+        if (isValidDetectedCurp(direct)) return direct;
 
         const fromText = findCurpInText(candidate);
-        if (fromText.length === 18) return fromText;
+        if (isValidDetectedCurp(fromText)) return fromText;
       }
 
       return "";
@@ -2458,7 +2481,7 @@
       const curp = getCurpFromLatestReview();
 
       if (!curp || curp.length < 18) {
-        errEl.textContent = "No fue posible guardar el avance porque la IA no detectó una CURP válida en el documento CURP. Sube un documento CURP legible y vuelve al resumen para guardar avance.";
+        errEl.textContent = "No fue posible guardar el avance porque la CURP no existe o el documento CURP no quedó validado por IA. Sube un documento CURP correcto, vuelve a validar y después guarda el avance.";
         errEl.style.display = "block";
         return;
       }

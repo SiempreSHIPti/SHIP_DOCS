@@ -216,11 +216,32 @@ function isNameValidatedWithIne(reviewPayload = {}) {
   });
 }
 
+const CURP_REGEX = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
+
 function normalizeCurp(value) {
   return String(value || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 18);
+}
+
+function isValidCurp(value) {
+  return CURP_REGEX.test(normalizeCurp(value));
+}
+
+function reviewRowStatus(row = {}) {
+  return String(row?.status || row?.state || "").toLowerCase().trim();
+}
+
+function isCurpRowValidated(row = {}) {
+  if (!row) return false;
+  const status = reviewRowStatus(row);
+  const severity = String(row?.severity || "").toLowerCase().trim();
+
+  if (row?.ok === false || severity === "error") return false;
+  if (["rejected", "missing", "invalid", "manual_review", "warning", "pending"].includes(status)) return false;
+  if (row?.ok === true) return true;
+  return ["approved", "ok", "valid", "validated", "success"].includes(status);
 }
 
 function findCurpInText(value) {
@@ -231,7 +252,9 @@ function findCurpInText(value) {
 
 function getCurpFromReview(reviewPayload) {
   const rows = reviewPayload?.results || [];
-  const curpRow = rows.find((row) => row.fieldName === "curp");
+  const curpRow = rows.find((row) => row?.fieldName === "curp");
+
+  if (!isCurpRowValidated(curpRow)) return "";
 
   const candidates = [
     curpRow?.fields?.curp,
@@ -243,10 +266,10 @@ function getCurpFromReview(reviewPayload) {
 
   for (const candidate of candidates) {
     const direct = normalizeCurp(candidate);
-    if (direct.length === 18) return direct;
+    if (isValidCurp(direct)) return direct;
 
     const fromText = findCurpInText(candidate);
-    if (fromText.length === 18) return fromText;
+    if (isValidCurp(fromText)) return fromText;
   }
 
   return "";
