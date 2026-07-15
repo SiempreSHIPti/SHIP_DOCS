@@ -242,6 +242,65 @@ async function deleteExistingByNameInFolder(drive, folderId, fileName, driveId) 
   }
 }
 
+
+function positiveNumberEnv(name, def) {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : def;
+}
+
+function textFromShape(shape) {
+  return (shape?.text?.textElements || [])
+    .map((te) => te?.textRun?.content || "")
+    .join("");
+}
+
+function findTextShapeIdsByToken(presentation, token) {
+  const ids = new Set();
+  for (const slide of presentation?.slides || []) {
+    for (const el of slide?.pageElements || []) {
+      const objectId = el?.objectId;
+      if (!objectId || !el?.shape) continue;
+      const text = textFromShape(el.shape);
+      if (text.includes(token)) ids.add(objectId);
+    }
+  }
+  return [...ids];
+}
+
+function buildCredentialTextFitRequests(presentation) {
+  // SHIP: la CURP mide 18 caracteres y, en la plantilla, puede partirse en dos líneas.
+  // No cambiamos la identidad visual; sólo activamos autofit y reducimos mínimamente
+  // los campos variables para que NSS/RFC/CURP permanezcan dentro del recuadro negro.
+  const targets = [
+    { token: "__DF_NSS__", fontSize: positiveNumberEnv("CRED_NSS_FONT_SIZE", 28) },
+    { token: "__DF_RFC__", fontSize: positiveNumberEnv("CRED_RFC_FONT_SIZE", 28) },
+    { token: "__DF_CURP__", fontSize: positiveNumberEnv("CRED_CURP_FONT_SIZE", 24) },
+  ];
+
+  const requests = [];
+  for (const target of targets) {
+    const objectIds = findTextShapeIdsByToken(presentation, target.token);
+    for (const objectId of objectIds) {
+      requests.push({
+        updateShapeProperties: {
+          objectId,
+          shapeProperties: { autofit: { autofitType: "TEXT_AUTOFIT" } },
+          fields: "autofit.autofitType",
+        },
+      });
+      requests.push({
+        updateTextStyle: {
+          objectId,
+          textRange: { type: "ALL" },
+          style: { fontSize: { magnitude: target.fontSize, unit: "PT" } },
+          fields: "fontSize",
+        },
+      });
+    }
+  }
+  return requests;
+}
+
 // ===== Validaciones: TODO viene del Sheet =====
 function normalizeCredentialRow(row) {
   const nombre = toUpperClean(row.nombre);
@@ -437,6 +496,17 @@ async function generateCredentialPdfFromRow({ row, drive, slides }) {
     tempPresId = copyRes.data.id;
 
     // 4) Reemplazar tokens + foto
+    let textFitRequests = [];
+    try {
+      const pres = await slides.presentations.get({
+        presentationId: tempPresId,
+        fields: "slides(pageElements(objectId,shape(text(textElements(textRun(content))))))",
+      });
+      textFitRequests = buildCredentialTextFitRequests(pres.data);
+    } catch (e) {
+      dlog("No se pudo preparar autofit de campos de credencial", e?.message || e);
+    }
+
     await slides.presentations.batchUpdate({
       presentationId: tempPresId,
       requestBody: {
@@ -456,6 +526,7 @@ async function generateCredentialPdfFromRow({ row, drive, slides }) {
           { replaceAllText: { containsText: { text: "__DF_RFC__", matchCase: true }, replaceText: rfc } },
           { replaceAllText: { containsText: { text: "__DF_CURP__", matchCase: true }, replaceText: curp } },
           { replaceAllText: { containsText: { text: "__DF_NSS__", matchCase: true }, replaceText: nss } },
+          ...textFitRequests,
           {
             replaceAllShapesWithImage: {
               containsText: { text: "__DF_FOTO__", matchCase: true },
