@@ -7,6 +7,7 @@ const sharp = require("sharp");
 const { execFile } = require("child_process");
 const { ENV, assertGoogleArchiveConfig } = require("../config/env");
 const { getClients } = require("../lib/google");
+const { generateCredentialPdfFromRow } = require("./credential");
 
 const execFileAsync = promisify(execFile);
 const TARGET_DRIVE_FILE_BYTES = 5 * 1024 * 1024; // objetivo: no más de 5 MB por archivo en Drive cuando la compresión lo permita
@@ -25,6 +26,8 @@ const GOOGLE_FILE_FIELDS = [
   ["tarjeta", "Tarjeta circulación"],
   ["poliza", "Póliza seguro"],
 ];
+
+const FIELD_LABELS = Object.fromEntries(GOOGLE_FILE_FIELDS);
 
 const SHEETS_HEADERS = [
   "Fecha registro",
@@ -59,6 +62,8 @@ const SHEETS_HEADERS = [
   "Licencia",
   "Tarjeta circulación",
   "Póliza seguro",
+  "Detalle documentos rechazados",
+  "Detalle documentos con observación",
   "Resumen revisión IA JSON",
 ];
 
@@ -164,6 +169,132 @@ function extractClabeFromReview(reviewPayload = {}) {
     row?.issues,
     row?.warnings
   ));
+}
+
+
+function cleanSheetText(value) {
+  return String(value || "").replace(/^'+/, "").trim();
+}
+
+function asSheetText(value) {
+  const clean = cleanSheetText(value);
+  return clean ? `'${clean}` : "";
+}
+
+function normalizeNssForSheet(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length >= 11) return digits.slice(0, 11);
+  // En NSS reales puede existir cero inicial; si IA lo cortó y quedan 10 dígitos, lo restauramos.
+  if (digits.length === 10) return `0${digits}`;
+  return digits;
+}
+
+function extractNssFromReview(reviewPayload = {}) {
+  const row = (reviewPayload?.results || []).find((item) => item?.fieldName === "nss_file");
+  const fields = row?.fields || {};
+  const values = [fields.nss, fields.numero_seguro_social, fields.numeroSeguroSocial, fields.numero_nss, fields.numeroNss];
+  for (const value of values) {
+    const nss = normalizeNssForSheet(value);
+    if (nss.length === 11) return nss;
+  }
+  const text = reviewText(row?.summary, row?.fields, row?.issues, row?.warnings);
+  const match = text.match(/(?:NSS|SEGURO\s+SOCIAL|NUMERO\s+DE\s+SEGURIDAD\s+SOCIAL)[^0-9]{0,35}([0-9][0-9\s-]{9,18}[0-9])/i)
+    || text.match(/\b(\d{11})\b/);
+  return normalizeNssForSheet(match?.[1] || match?.[0] || "");
+}
+
+function normalizeRfc(value) {
+  return String(value || "").toUpperCase().replace(/[^A-ZÑ&0-9]/g, "").slice(0, 13);
+}
+
+function extractRfcFromReview(reviewPayload = {}) {
+  const row = (reviewPayload?.results || []).find((item) => item?.fieldName === "constancia");
+  const fields = row?.fields || {};
+  for (const value of [fields.rfc, fields.RFC, fields.registro_federal_contribuyentes, fields.tax_id]) {
+    const rfc = normalizeRfc(value);
+    if (/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc)) return rfc;
+  }
+  const text = reviewText(row?.summary, row?.fields, row?.issues, row?.warnings).toUpperCase();
+  return normalizeRfc(text.match(/\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b/)?.[1] || "");
+}
+
+function isNameValidatedWithIne(reviewPayload = {}) {
+  return (reviewPayload?.results || [])
+    .filter((row) => ["ine_frontal", "ine_reverso"].includes(row?.fieldName))
+    .some((row) => (row?.ok === true || String(row?.status || "").toLowerCase() === "approved")
+      && row?.ownerMatchesDriver !== false && row?.nameMatches !== false);
+}
+
+function getDraftCredentialReadiness({ bodyData = {}, reviewPayload = {}, googleFiles = {}, curp = "" } = {}) {
+  const nombre = String(bodyData.nombre || "").trim();
+  const nss = normalizeNssForSheet(bodyData.nssNum || bodyData.nss_num || extractNssFromReview(reviewPayload));
+  const rfc = normalizeRfc(bodyData.rfc || extractRfcFromReview(reviewPayload));
+  const curpValue = normalizeCurpForLookup(bodyData.curpTxt || bodyData.curp_txt || curp);
+  const selfieLink = googleFiles.selfie?.webViewLink || "";
+
+  const missing = [];
+  if (!nombre) missing.push("nombre");
+  if (curpValue.length !== 18) missing.push("curp");
+  if (!/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc)) missing.push("rfc");
+  if (nss.length !== 11) missing.push("nss");
+  if (!selfieLink) missing.push("foto");
+
+  return {
+    ready: missing.length === 0,
+    missing,
+    row: {
+      nombre,
+      puesto: normalizeVacancyType(bodyData.tipoVacante || bodyData.tipo_vacante || bodyData.vacante) || ENV.PUESTO_DEFAULT || "OPERADOR",
+      rfc,
+      curp: curpValue,
+      nss,
+      selfieLink,
+    },
+  };
+}
+
+function documentNamesByStatus(reviewPayload = {}, kind = "rejected") {
+  const rows = Array.isArray(reviewPayload?.results) ? reviewPayload.results : [];
+  return [...new Set(rows.filter((row) => {
+    const status = String(row?.status || "").toLowerCase();
+    const severity = String(row?.severity || "").toLowerCase();
+    if (kind === "rejected") return row?.ok === false || status === "rejected" || status === "missing" || severity === "error";
+    return status === "warning" || severity === "warning";
+  }).map(reviewRowLabel))].join(", ");
+}
+
+function reviewRowLabel(row = {}) {
+  return row.label || FIELD_LABELS?.[row.fieldName] || row.fieldName || "Documento";
+}
+
+function reviewRowReasons(row = {}) {
+  const parts = [
+    row.summary,
+    ...(Array.isArray(row.issues) ? row.issues : []),
+    ...(Array.isArray(row.warnings) ? row.warnings : []),
+  ]
+    .filter(Boolean)
+    .map((x) => String(x).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  return [...new Set(parts)].slice(0, 2).join(" | ");
+}
+
+function detailRowsByStatus(reviewPayload = {}, kind = "rejected") {
+  const rows = Array.isArray(reviewPayload?.results) ? reviewPayload.results : [];
+  const filtered = rows.filter((row) => {
+    const status = String(row?.status || "").toLowerCase();
+    const severity = String(row?.severity || "").toLowerCase();
+    if (kind === "rejected") return row?.ok === false || status === "rejected" || status === "missing" || severity === "error";
+    if (kind === "warning") return status === "warning" || severity === "warning";
+    return false;
+  });
+
+  return filtered.map((row) => {
+    const reason = reviewRowReasons(row);
+    return reason ? `${reviewRowLabel(row)}: ${reason}` : reviewRowLabel(row);
+  }).join("\n");
 }
 
 
@@ -495,7 +626,7 @@ async function ensureSheetHeader(sheets) {
 
   const current = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${quotedSheet}!A1:AG1`,
+    range: `${quotedSheet}!A1:AI1`,
   }).catch((err) => {
     // Si el rango aún no está disponible por consistencia eventual,
     // continuamos y escribimos encabezados.
@@ -527,7 +658,8 @@ async function ensureSheetHeader(sheets) {
     });
   }
 
-  if (!hasHeader || headerRow[3] !== "Tipo de vacante") {
+  const hasDetailHeaders = headerRow.includes("Detalle documentos rechazados") && headerRow.includes("Detalle documentos con observación");
+  if (!hasHeader || headerRow[3] !== "Tipo de vacante" || !hasDetailHeaders) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${quotedSheet}!A1`,
@@ -548,6 +680,10 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
   const clabeFromReview = extractClabeFromReview(reviewPayload);
   const banco = normalizeBankName(bodyData.banco || bankFromReview);
   const clabe = extractClabeFromText(bodyData.clabeTxt || bodyData.clabe || clabeFromReview);
+  const nss = normalizeNssForSheet(bodyData.nssNum || bodyData.nss_num || extractNssFromReview(reviewPayload));
+  const rfc = normalizeRfc(bodyData.rfc || extractRfcFromReview(reviewPayload));
+  const rejectedDetail = detailRowsByStatus(reviewPayload, "rejected");
+  const warningsDetail = detailRowsByStatus(reviewPayload, "warning");
 
   return [
     nowMxIsoLike(),
@@ -558,14 +694,14 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
     bodyData.telefono || "",
     bodyData.direccion || "",
     banco,
-    clabe,
-    bodyData.nssNum || "",
-    bodyData.rfc || "",
+    asSheetText(clabe),
+    asSheetText(nss),
+    rfc,
     bodyData.curpTxt || localResult.curp || "",
     status,
     summary.approved || 0,
-    summary.rejected || 0,
-    summary.warnings || 0,
+    documentNamesByStatus(reviewPayload, "rejected"),
+    documentNamesByStatus(reviewPayload, "warning"),
     summary.missing || 0,
     summary.skipped || 0,
     driverFolder.webViewLink || driveFolderUrl(driverFolder.id),
@@ -582,6 +718,8 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
     fileLink("licencia"),
     fileLink("tarjeta"),
     fileLink("poliza"),
+    rejectedDetail,
+    warningsDetail,
     JSON.stringify(reviewPayload || {}),
   ];
 }
@@ -595,7 +733,7 @@ async function appendToSheet(sheets, row) {
 
   const appended = await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${quotedSheet}!A:AG`,
+    range: `${quotedSheet}!A:AI`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
@@ -618,7 +756,7 @@ async function readSheetRows(sheets) {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${quotedSheet}!A:AG`,
+    range: `${quotedSheet}!A:AI`,
   }).catch((err) => {
     if (err?.code === 400 || err?.code === 404) return { data: { values: [] } };
     throw err;
@@ -670,7 +808,7 @@ async function updateSheetRow(sheets, rowNumber, row) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${quotedSheet}!A${rowNumber}:AG${rowNumber}`,
+    range: `${quotedSheet}!A${rowNumber}:AI${rowNumber}`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
       values: [row],
@@ -816,7 +954,7 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
   assertGoogleArchiveConfig();
 
   const parentId = ENV.GOOGLE_DRIVE_PARENT_FOLDER_ID || ENV.DRIVE_PARENT_FOLDER_ID;
-  const { drive, sheets } = await getClients();
+  const { drive, sheets, slides } = await getClients();
 
   const curp = normalizeCurpForLookup(draftResult.curp || bodyData.curpTxt || "");
   const folderName = `${safeName(bodyData.nombre)}_${safeName(curp || draftResult.jobId || "BORRADOR")}`;
@@ -863,6 +1001,32 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
     });
   } catch (err) {
     console.warn("[googleArchive] No se pudo guardar manifest de borrador:", err?.message || err);
+  }
+
+  const draftCredential = getDraftCredentialReadiness({
+    bodyData,
+    reviewPayload,
+    googleFiles,
+    curp,
+  });
+
+  if (draftCredential.ready) {
+    try {
+      const generated = await generateCredentialPdfFromRow({
+        row: draftCredential.row,
+        drive,
+        slides,
+      });
+      if (generated?.ok) {
+        googleFiles.credentialPdf = { id: generated.pdfId, webViewLink: generated.pdfLink };
+      } else {
+        console.warn("[googleArchive] Credencial de borrador omitida:", generated?.reason || generated?.errors || generated);
+      }
+    } catch (err) {
+      console.warn("[googleArchive] No se pudo generar credencial del borrador:", err?.message || err);
+    }
+  } else {
+    console.info("[googleArchive] Credencial de borrador no generada. Faltan:", draftCredential.missing.join(", "));
   }
 
   const row = buildSheetRow({
@@ -983,9 +1147,150 @@ async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayloa
   };
 }
 
+
+function extractDriveFileIdFromUrl(value) {
+  const s = String(value || "").trim();
+  if (!s) return "";
+  let m = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  m = s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(s)) return s;
+  return "";
+}
+
+function stripSheetText(value) {
+  return String(value || "").replace(/^'+/, "").trim();
+}
+
+function rowReviewPayload(row = []) {
+  for (let i = row.length - 1; i >= 0; i--) {
+    const cell = String(row[i] || "").trim();
+    if (!cell || !cell.startsWith("{")) continue;
+    try {
+      const parsed = JSON.parse(cell);
+      if (parsed?.results || parsed?.summary) return parsed;
+    } catch (_) {}
+  }
+  return null;
+}
+
+function rowToDraftData(row = []) {
+  return {
+    tipo_vacante: String(row[3] || "").toLowerCase(),
+    tipoVacante: String(row[3] || ""),
+    nombre: row[4] || "",
+    telefono: stripSheetText(row[5] || ""),
+    direccion: row[6] || "",
+    banco: row[7] || "",
+    clabe: stripSheetText(row[8] || ""),
+    clabeTxt: stripSheetText(row[8] || ""),
+    clabe_mode: "archivo",
+    nss_mode: "archivo",
+    nss_num: stripSheetText(row[9] || ""),
+    nssNum: stripSheetText(row[9] || ""),
+    rfc: row[10] || "",
+    curp_txt: row[11] || "",
+    curpTxt: row[11] || "",
+  };
+}
+
+async function downloadDriveFileToLocal(drive, fileId, targetPath) {
+  const meta = await drive.files.get({
+    fileId,
+    fields: "name,mimeType,size",
+    supportsAllDrives: true,
+  });
+
+  const media = await drive.files.get({
+    fileId,
+    alt: "media",
+    supportsAllDrives: true,
+  }, {
+    responseType: "arraybuffer",
+  });
+
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.writeFileSync(targetPath, Buffer.from(media.data));
+
+  return {
+    name: meta.data?.name || path.basename(targetPath),
+    mimeType: meta.data?.mimeType || mime.lookup(targetPath) || "application/octet-stream",
+    size: Number(meta.data?.size || 0) || fs.statSync(targetPath).size,
+  };
+}
+
+async function loadGoogleDraftAsLocal(curpRaw) {
+  if (!isEnabled()) return null;
+  const curp = normalizeCurpForLookup(curpRaw);
+  if (!curp || curp.length < 18) return null;
+
+  assertGoogleArchiveConfig();
+
+  const { drive, sheets } = await getClients();
+  const matches = await findRowsByCurp(sheets, curp);
+  const draftRow = matches.find((m) => isDraftStatus(m.status));
+  if (!draftRow) return null;
+
+  const row = draftRow.row || [];
+  const data = rowToDraftData(row);
+  const latestReviewPayload = rowReviewPayload(row) || { summary: {}, results: [] };
+
+  const draftRoot = path.resolve(process.cwd(), ENV.LOCAL_RECORDS_DIR || ".local-records", "drafts", curp);
+  const filesRoot = path.join(draftRoot, "google-drive-files");
+  fs.mkdirSync(filesRoot, { recursive: true });
+
+  const filePaths = {};
+  const fileStartIndex = 20;
+  for (let i = 0; i < GOOGLE_FILE_FIELDS.length; i++) {
+    const [fieldName] = GOOGLE_FILE_FIELDS[i];
+    const link = row[fileStartIndex + i] || "";
+    const fileId = extractDriveFileIdFromUrl(link);
+    if (!fileId) continue;
+
+    try {
+      const tmpName = `${fieldName}_${fileId}`;
+      const target = path.join(filesRoot, tmpName);
+      const meta = await downloadDriveFileToLocal(drive, fileId, target);
+      const ext = mime.extension(meta.mimeType) || path.extname(meta.name || "").replace(".", "") || "bin";
+      const finalPath = `${target}.${ext}`;
+      if (target !== finalPath) {
+        try { fs.renameSync(target, finalPath); } catch (_) {}
+      }
+
+      filePaths[fieldName] = {
+        absolutePath: finalPath,
+        relativePath: path.relative(process.cwd(), finalPath),
+        url: driveFileUrl(fileId),
+        originalName: meta.name || `${fieldName}.${ext}`,
+        mimeType: meta.mimeType,
+        sizeBytes: fs.existsSync(finalPath) ? fs.statSync(finalPath).size : meta.size,
+        googleFileId: fileId,
+      };
+    } catch (err) {
+      console.warn(`[googleArchive] No se pudo restaurar archivo de borrador ${fieldName}:`, err?.message || err);
+    }
+  }
+
+  const draft = {
+    curp,
+    savedAt: new Date().toISOString(),
+    data,
+    filePaths,
+    latestReviewPayload,
+    source: "google_sheets_drive",
+    sheetRowNumber: draftRow.rowNumber,
+  };
+
+  fs.writeFileSync(path.join(draftRoot, "draft.json"), JSON.stringify(draft, null, 2), "utf8");
+  return draft;
+}
+
+
 module.exports = {
   archiveRegistrationToGoogle,
   archiveDraftToGoogle,
   findFinalRegistrationByCurp,
+  loadGoogleDraftAsLocal,
   assertNoDuplicateFinalRegistration,
 };

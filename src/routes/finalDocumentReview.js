@@ -240,6 +240,41 @@ function filterResultsForSummary(results = [], body = {}) {
   return (results || []).filter((row) => !shouldOmitDocumentFromSummary(row?.fieldName, body, row));
 }
 
+function parseJsonObject(value) {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function validationMapFromReviewPayload(reviewPayload, body = {}) {
+  const rows = filterResultsForSummary(Array.isArray(reviewPayload?.results) ? reviewPayload.results : [], body);
+  return rows.reduce((acc, row) => {
+    if (row?.fieldName && FILE_FIELDS.includes(row.fieldName)) acc[row.fieldName] = row;
+    return acc;
+  }, {});
+}
+
+function clientSeedValidation(body = {}) {
+  const payload = parseJsonObject(body.clientReviewPayload || body.existingReviewPayload || body.latestReviewPayload);
+  return validationMapFromReviewPayload(payload, body);
+}
+
+function finalReviewFromValidationMap(body = {}, validationMap = {}, source = "partial_reviews_merged") {
+  const results = buildFinalResultsFromStoredValidation(body, validationMap);
+  const summary = summarize(results);
+  return {
+    summary,
+    results,
+    reviewedAt: new Date().toISOString(),
+    source,
+  };
+}
+
 function isFileRequired(fieldName, body) {
   const vacancyType = normalizeVacancyType(body?.tipo_vacante || body?.tipoVacante || body?.vacante || "driver");
 
@@ -406,6 +441,98 @@ function isOwnershipObservationText(text) {
     text.includes("no requiere coincidencia de nombre") ||
     text.includes("no requerir coincidencia")
   );
+}
+
+function issueTextOf(row = {}) {
+  return [
+    row.summary,
+    ...(Array.isArray(row.issues) ? row.issues : []),
+    ...(Array.isArray(row.warnings) ? row.warnings : []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function fieldValueText(row = {}, ...keys) {
+  const fields = row.fields || {};
+  for (const key of keys) {
+    const value = fields[key];
+    if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+  }
+  return "";
+}
+
+function hasCriticalDocumentIssue(row = {}) {
+  const text = issueTextOf(row);
+  return (
+    text.includes("no parece ser") ||
+    text.includes("no corresponde") ||
+    text.includes("otro documento") ||
+    text.includes("documento incorrecto") ||
+    text.includes("no es el documento esperado") ||
+    text.includes("no es legible") ||
+    text.includes("ilegible") ||
+    text.includes("borroso") ||
+    text.includes("no se pudo validar con gemini") ||
+    text.includes("falta gemini_api_key") ||
+    text.includes("error validando")
+  );
+}
+
+function canSoftenManualReview(row = {}, fieldName) {
+  if (!row || row.ok === true) return false;
+  if (row.missing || row.skippedByWeight || row.blocking === true) return false;
+  if (String(row.recommendation || "").toLowerCase() !== "manual_review") return false;
+  if (row.isExpectedDocument === false || row.isLegible === false) return false;
+  if (hasCriticalDocumentIssue(row)) return false;
+
+  const confidence = Number(row.confidence || 0);
+  if (Number.isFinite(confidence) && confidence > 0 && confidence < 0.55) return false;
+
+  // INE frontal, CURP, NSS y estado de cuenta siguen siendo estrictos porque de ahí
+  // salen datos críticos para identidad, CURP, NSS y CLABE.
+  if (["ine_frontal", "curp", "nss_file", "estado_cuenta"].includes(fieldName)) return false;
+
+  if (fieldName === "constancia") {
+    const rfc = fieldValueText(row, "rfc", "RFC", "registro_federal_contribuyentes", "tax_id")
+      .toUpperCase()
+      .replace(/[^A-ZÑ&0-9]/g, "");
+    return /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc);
+  }
+
+  // INE reverso y licencia pueden quedar en amarillo si la IA ve el documento real
+  // pero no alcanza aprobación automática por un dato parcial como vigencia/MRZ/QR.
+  if (["ine_reverso", "licencia", "tarjeta", "poliza", "comprobante", "selfie", "acta"].includes(fieldName)) {
+    return true;
+  }
+
+  return false;
+}
+
+function softenManualReviewResult(row = {}, fieldName) {
+  if (!canSoftenManualReview(row, fieldName)) return row;
+
+  const issues = Array.isArray(row.issues) ? row.issues.filter(Boolean) : [];
+  const warnings = Array.isArray(row.warnings) ? row.warnings.filter(Boolean) : [];
+
+  return {
+    ...row,
+    ok: true,
+    status: "warning",
+    severity: "warning",
+    recommendation: "manual_review",
+    blocking: false,
+    issues: [],
+    warnings: [
+      ...warnings,
+      ...(issues.length ? issues : ["Documento válido, pero requiere revisión operativa."])
+    ],
+    summary: `${row.label || fieldName}: documento válido con observación no bloqueante.`,
+    softenedManualReview: true,
+  };
 }
 
 function clearNameAccentIssues(result, expectedName) {
@@ -608,6 +735,7 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
   const partialFields = parsePartialFields(body.partialFields);
   const finalizeFromPartials = isFinalizeFromPartials(body);
   const heavySkippedFiles = parseHeavySkippedFiles(body.aiSkippedHeavyFiles);
+  const seededValidation = clientSeedValidation(body);
 
   setJob(jobId, {
     ok: true,
@@ -629,6 +757,7 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
 
   if (finalizeFromPartials) {
     const storedValidation = {
+      ...seededValidation,
       ...(getJob(jobId)?.data?.documentValidation || {}),
       ...Object.fromEntries(Array.from(heavySkippedFiles.entries()).map(([fieldName, info]) => [
         fieldName,
@@ -750,15 +879,16 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
           });
 
           const operationalResult = applyOperationalRules(result, fieldName, nombreValidacion || nombre || "SIN_NOMBRE");
+          const finalOperationalResult = softenManualReviewResult(operationalResult, fieldName);
 
-          const status = operationalResult.severity === "warning" || operationalResult.status === "warning"
+          const status = finalOperationalResult.severity === "warning" || finalOperationalResult.status === "warning"
             ? "warning"
-            : operationalResult.ok
+            : finalOperationalResult.ok
               ? "approved"
               : "rejected";
 
           return {
-            ...operationalResult,
+            ...finalOperationalResult,
             status,
             fileName: file.originalname,
             validatedAt: new Date().toISOString(),
@@ -806,7 +936,10 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
     }
   }
 
-  const previousValidation = getJob(jobId)?.data?.documentValidation || {};
+  const previousValidation = {
+    ...seededValidation,
+    ...(getJob(jobId)?.data?.documentValidation || {}),
+  };
   const mergedValidation = {
     ...previousValidation,
     ...results.reduce((acc, row) => {
@@ -814,6 +947,12 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
       return acc;
     }, {}),
   };
+
+  const mergedFinalReview = partialReview
+    ? finalReviewFromValidationMap(body, mergedValidation)
+    : null;
+  const effectiveSummary = partialReview ? mergedFinalReview.summary : summary;
+  const effectiveResults = partialReview ? mergedFinalReview.results : results;
 
   const jobDataUpdate = {
     ...(getJob(jobId)?.data || {}),
@@ -832,18 +971,20 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
       reviewedAt: new Date().toISOString(),
       source: "full_review",
     };
+  } else {
+    jobDataUpdate.finalReview = mergedFinalReview;
   }
 
   setJob(jobId, {
-    ok: summary.canContinue,
+    ok: effectiveSummary.canContinue,
     state: partialReview ? "ai_partial_review_completed" : "ai_review_completed",
-    message: summary.canContinue
-      ? (summary.warnings ? "Documentos válidos con observaciones no bloqueantes." : "Documentos aprobados por IA.")
+    message: effectiveSummary.canContinue
+      ? (effectiveSummary.warnings ? "Documentos válidos con observaciones no bloqueantes." : "Documentos aprobados por IA.")
       : "La IA detectó documentos faltantes o con errores bloqueantes.",
     data: jobDataUpdate,
-    validationErrors: results.filter((x) => x.ok === false),
-    validationWarnings: results.filter((x) => x.status === "warning" || x.severity === "warning"),
-    finalReviewSummary: partialReview ? null : summary,
+    validationErrors: effectiveResults.filter((x) => x.ok === false),
+    validationWarnings: effectiveResults.filter((x) => x.status === "warning" || x.severity === "warning"),
+    finalReviewSummary: effectiveSummary,
     saved: false,
   });
 

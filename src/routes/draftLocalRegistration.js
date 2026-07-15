@@ -11,7 +11,7 @@ const {
   findCompletedRegistration,
 } = require("../services/localDraftStore");
 const { ENV } = require("../config/env");
-const { archiveDraftToGoogle, findFinalRegistrationByCurp } = require("../services/googleArchive");
+const { archiveDraftToGoogle, findFinalRegistrationByCurp, loadGoogleDraftAsLocal } = require("../services/googleArchive");
 
 const router = express.Router();
 
@@ -25,6 +25,23 @@ const uploadFields = upload.fields(FILE_FIELDS.map((name) => ({ name, maxCount: 
 function hasBoundary(req) {
   const ct = req.headers["content-type"];
   return typeof ct === "string" && ct.includes("multipart/form-data") && ct.includes("boundary=");
+}
+
+
+function parseClientReviewPayload(value) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(String(value));
+    if (!parsed?.summary || !Array.isArray(parsed?.results)) return null;
+    return {
+      summary: parsed.summary,
+      results: parsed.results,
+      reviewedAt: parsed.reviewedAt || new Date().toISOString(),
+      source: parsed.source || "client_review_payload",
+    };
+  } catch (_) {
+    return null;
+  }
 }
 
 function processUploadMiddleware(req, res, next) {
@@ -47,7 +64,7 @@ router.post("/api/registration/save-draft-local", processUploadMiddleware, async
   if (!jobId) return res.status(400).json({ ok: false, error: "Falta jobId." });
 
   const job = getJob(jobId) || {};
-  const finalReview = job.data?.finalReview || null;
+  const finalReview = job.data?.finalReview || parseClientReviewPayload(req.body.clientReviewPayload) || null;
 
   if (!finalReview?.summary) {
     return res.status(400).json({
@@ -102,16 +119,24 @@ router.post("/api/registration/save-draft-local", processUploadMiddleware, async
       });
     }
 
+    const credentialGenerated = Boolean(googleDraft?.googleFiles?.credentialPdf?.webViewLink);
+    const message = credentialGenerated
+      ? `Avance guardado correctamente y credencial generada. Para continuar después, usa la CURP ${result.curp}.`
+      : `Avance guardado correctamente. Para continuar después, usa la CURP ${result.curp}.`;
+
     setJob(jobId, {
       state: "draft_saved_local",
-      message: `Avance guardado correctamente. Para continuar después, usa la CURP ${result.curp}.`,
+      message,
       localDraft: result,
       googleDraft,
+      credentialGenerated,
     });
 
     return res.json({
       ok: true,
-      message: `Avance guardado correctamente. Para continuar después, usa la CURP ${result.curp}.`,
+      message,
+      credentialGenerated,
+      credentialLink: googleDraft?.googleFiles?.credentialPdf?.webViewLink || "",
       ...result,
       googleDraft,
     });
@@ -157,11 +182,16 @@ router.get("/api/registration/draft-local/:curp", async (req, res) => {
     }
   }
 
-  const draft = await loadLocalDraft(curp);
+  let draft = await loadLocalDraft(curp);
+
+  if (!draft && useGoogleArchiveAsRegistry()) {
+    draft = await loadGoogleDraftAsLocal(curp);
+  }
+
   if (!draft) {
     return res.status(404).json({
       ok: false,
-      error: "No se encontró avance local para esa CURP.",
+      error: "No se encontró avance para esa CURP.",
     });
   }
 

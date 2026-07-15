@@ -161,6 +161,61 @@ function extractClabeFromReview(reviewPayload = {}) {
 }
 
 
+function normalizeNss(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length >= 11) return digits.slice(0, 11);
+  if (digits.length === 10) return `0${digits}`;
+  return digits;
+}
+
+function extractNssFromReview(reviewPayload = {}) {
+  const row = (reviewPayload?.results || []).find((item) => item?.fieldName === "nss_file");
+  const fields = row?.fields || {};
+  const direct = [
+    fields.nss,
+    fields.numero_seguro_social,
+    fields.numeroSeguroSocial,
+    fields.numero_nss,
+    fields.numeroNss,
+    fields.social_security_number,
+  ];
+  for (const value of direct) {
+    const nss = normalizeNss(value);
+    if (nss.length === 11) return nss;
+  }
+  const text = reviewText(row?.summary, row?.fields, row?.issues, row?.warnings);
+  const match = text.match(/(?:NSS|SEGURO\s+SOCIAL|NUMERO\s+DE\s+SEGURIDAD\s+SOCIAL)[^0-9]{0,35}([0-9][0-9\s-]{9,18}[0-9])/i)
+    || text.match(/\b(\d{11})\b/);
+  return normalizeNss(match?.[1] || match?.[0] || "");
+}
+
+function normalizeRfc(value) {
+  return String(value || "").toUpperCase().replace(/[^A-ZÑ&0-9]/g, "").slice(0, 13);
+}
+
+function extractRfcFromReview(reviewPayload = {}) {
+  const row = (reviewPayload?.results || []).find((item) => item?.fieldName === "constancia");
+  const fields = row?.fields || {};
+  const direct = [fields.rfc, fields.RFC, fields.registro_federal_contribuyentes, fields.tax_id];
+  for (const value of direct) {
+    const rfc = normalizeRfc(value);
+    if (/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc)) return rfc;
+  }
+  const text = reviewText(row?.summary, row?.fields, row?.issues, row?.warnings).toUpperCase();
+  const match = text.match(/\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b/);
+  return normalizeRfc(match?.[1] || "");
+}
+
+function isNameValidatedWithIne(reviewPayload = {}) {
+  const rows = (reviewPayload?.results || []).filter((item) => ["ine_frontal", "ine_reverso"].includes(item?.fieldName));
+  return rows.some((row) => {
+    const approved = row?.ok === true || String(row?.status || "").toLowerCase() === "approved";
+    const noMismatch = row?.ownerMatchesDriver !== false && row?.nameMatches !== false;
+    return approved && noMismatch;
+  });
+}
+
 function normalizeCurp(value) {
   return String(value || "")
     .toUpperCase()
@@ -222,7 +277,7 @@ async function ensureDir(dir) {
 function normalizeBody(body = {}, reviewPayload = {}) {
   const data = {};
   for (const [key, value] of Object.entries(body || {})) {
-    if (key === "latestReviewPayload") continue;
+    if (["latestReviewPayload", "clientReviewPayload", "existingReviewPayload"].includes(key)) continue;
     if (value === undefined || value === null) continue;
     data[key] = String(value);
   }
@@ -234,6 +289,18 @@ function normalizeBody(body = {}, reviewPayload = {}) {
     data.clabeTxt = clabe;
     data.clabe_mode = data.clabe_mode || "archivo";
   }
+
+  const nss = normalizeNss(data.nss_num || data.nssNum || extractNssFromReview(reviewPayload));
+  if (nss) {
+    data.nss_num = nss;
+    data.nssNum = nss;
+    data.nss_mode = "archivo";
+  }
+
+  const rfc = normalizeRfc(data.rfc || extractRfcFromReview(reviewPayload));
+  if (rfc) data.rfc = rfc;
+  data.nombre_validado_ine = isNameValidatedWithIne(reviewPayload) ? "1" : "0";
+
   return data;
 }
 

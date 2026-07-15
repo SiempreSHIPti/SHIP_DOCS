@@ -628,6 +628,41 @@
     }
   </style>
 
+  <style id="ship-functional-fixes">
+    .vacancy-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; }
+    .vacancy-option { min-width: 0; width: 100%; min-height: 112px; overflow-wrap: anywhere; text-align: left; }
+    .vacancy-option strong, .vacancy-option span { display: block; }
+    .vacancy-option span { line-height: 1.35; }
+    .nss-mode-single { display: block; padding: 12px 14px; border-radius: 12px; }
+    .review-screen { scroll-margin-top: 16px; }
+    .review-actions { position: sticky; bottom: 0; z-index: 20; padding-top: 12px; backdrop-filter: blur(10px); }
+    body.review-summary-mode .section.step,
+    body.review-summary-mode .nav-buttons { display: none !important; }
+    body.review-summary-mode #ai-review-screen { margin-top: 0 !important; }
+    body.review-summary-mode #ai-review-screen.active { display: block !important; }
+    body.review-summary-mode #review-loading.active { display: flex !important; }
+    .review-inline-upload-note { margin-top: 7px; font-size: .78rem; overflow-wrap: anywhere; }
+    .review-item.pending-upload { outline: 2px solid rgba(248,0,32,.20); outline-offset: 2px; }
+    @media (max-width: 760px) {
+      .vacancy-options { grid-template-columns: 1fr !important; }
+      .vacancy-option { min-height: 86px; }
+      .form-container { padding-left: 10px !important; padding-right: 10px !important; }
+      .field-group, .review-screen { padding: 14px !important; border-radius: 14px !important; }
+      .grid { gap: 10px !important; }
+      .col-6 { grid-column: span 12 !important; width: 100% !important; }
+      input, select, textarea, button { max-width: 100%; }
+      .review-hero, .review-stats { grid-template-columns: 1fr !important; }
+      .review-stats { display: grid !important; grid-template-columns: repeat(2, minmax(0,1fr)) !important; gap: 8px !important; }
+      .review-item { grid-template-columns: auto minmax(0,1fr) !important; gap: 10px !important; }
+      .review-item-actions { grid-column: 1 / -1; width: 100%; }
+      .review-replace-btn { width: 100%; }
+      .review-actions { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
+      .review-actions button { width: 100%; min-height: 48px; }
+      .nav-buttons { display: grid !important; grid-template-columns: 1fr !important; gap: 8px; }
+      .nav-buttons button { width: 100%; }
+    }
+  </style>
+
 </head>
 
 <body class="pre-registration">
@@ -925,6 +960,7 @@
                   <div class="grid">
                     <div class="col-6" id="nss_file_wrap">
                       <input type="file" id="nss_file" name="nss_file" accept=".pdf,.jpg,.jpeg,.png" />
+                      <input type="hidden" id="nss_num" name="nss_num" value="" />
                       <a class="help-link"
                         href="https://serviciosdigitales.imss.gob.mx/gestionAsegurados-web-externo/asignacionNSS"
                         target="_blank" rel="noopener noreferrer">Consultar NSS →</a>
@@ -1127,8 +1163,7 @@
               <div class="review-list" id="review-list"></div>
 
               <div class="review-actions">
-                <button type="button" class="btn-primary-review" id="review-revalidate-btn">Validar archivos
-                  corregidos</button>
+                <button type="button" class="btn-primary-review" id="review-revalidate-btn">Validar archivos corregidos</button>
                 <button type="button" class="btn-secondary-review" id="save-draft-btn">Guardar avance</button>
                 <button type="button" class="btn-secondary-review" id="review-finish-btn">Guardar registro</button>
               </div>
@@ -1180,6 +1215,7 @@
     let loadedDraftCurp = "";
     let appModalAfterClose = null;
     let mapsAutocompleteReady = false;
+    const reviewReplacementFilesByField = new Map();
 
     const STEP_FILE_FIELDS = {
       1: ["selfie", "estado_cuenta"],
@@ -1187,6 +1223,8 @@
       3: ["licencia", "tarjeta", "poliza"],
       4: []
     };
+
+    const FILE_FIELDS_FOR_REVIEW = new Set(Object.values(STEP_FILE_FIELDS).flat());
 
     const STEP_LABELS = {
       1: "Datos personales",
@@ -1321,7 +1359,7 @@
       }
 
       if (vacancy === "driver") {
-        notice.textContent = "Vacante Driver: licencia obligatoria. Tarjeta de circulación, póliza y acta de nacimiento son opcionales; si las subes, se revisarán.";
+        notice.textContent = "Vacante Driver: licencia obligatoria. Tarjeta de circulación y póliza son opcionales; si las subes, se revisarán.";
       } else if (vacancy === "chofer") {
         notice.textContent = "Vacante Chofer: sólo se solicitará licencia de conducir. No se solicita tarjeta de circulación ni póliza.";
       } else if (vacancy === "ayudante") {
@@ -1338,12 +1376,13 @@
 
     function clearFileInput(input) {
       if (!input) return;
-      try { input.value = ""; } catch (_) { }
+      try { input.value = ""; } catch (_) {}
       clearRecoveredFileControl(input);
       const status = input.parentElement?.querySelector(".file-status");
       if (status) status.remove();
       delete partialValidationByField[input.name];
       fieldsPendingTargetedRevalidation.delete(input.name);
+      reviewReplacementFilesByField.delete(input.name);
       delete input.dataset.targetedRevalidate;
     }
 
@@ -1372,7 +1411,7 @@
       const showLicencia = vacancy === "driver" || vacancy === "chofer";
       const showTarjeta = vacancy === "driver"; // Driver: se solicita, pero es opcional.
       const showPoliza = vacancy === "driver"; // Driver: se solicita, pero es opcional.
-      const showActa = true; // Driver: se muestra, pero es opcional.
+      const showActa = vacancy !== "driver"; // Driver: acta opcional/no solicitada.
 
       setFieldVisibility("licencia", showLicencia);
       setFieldVisibility("tarjeta", showTarjeta);
@@ -1382,18 +1421,9 @@
       setRequiredMark("licencia", showLicencia);
       setRequiredMark("tarjeta", false);
       setRequiredMark("poliza", false);
-      setRequiredMark("acta", vacancy !== "driver");
+      setRequiredMark("acta", showActa);
 
       updateVehicleHelpText(vacancy);
-
-      const actaHelp = document.getElementById("acta-help");
-      if (actaHelp) {
-        actaHelp.textContent = vacancy === "driver"
-          ? "Para Driver es opcional. Si la subes, se validará con IA."
-          : "Documento requerido para esta vacante.";
-      }
-
-
 
       document.querySelectorAll("[data-vacancy]").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.vacancy === vacancy);
@@ -1410,8 +1440,7 @@
     }
 
     function requireVacancyBeforeStart() {
-      const box = document.getElementById("vacancy-box");
-      if (box) box.classList.add("active");
+      setLandingMode("new");
       showAppModal("Selecciona la vacante", "Antes de iniciar, elige si aplica como Driver, Chofer o Ayudante.", { type: "error" });
     }
 
@@ -1661,16 +1690,20 @@
     async function revalidateTargetedCorrectionFiles() {
       await runtimeConfigPromise;
 
-      const failedFields = failedFieldsFromPayload(latestReviewPayload);
-      const fields = Array.from(fieldsPendingTargetedRevalidation)
-        .filter((field) => failedFields.includes(field) || !failedFields.length);
+      const hasCorrectionFile = (field) => {
+        if (reviewReplacementFilesByField.has(field)) return true;
+        const input = document.querySelector(`input[type="file"][name="${CSS.escape(field)}"]`);
+        return !!((input?.files || [])[0]);
+      };
 
-      const targetFields = fields.length ? fields : failedFields;
+      const targetFields = Array.from(fieldsPendingTargetedRevalidation)
+        .filter((field) => FILE_FIELDS_FOR_REVIEW.has(field))
+        .filter(hasCorrectionFile);
 
       if (!targetFields.length) {
-        showSectionValidationToast("Sin archivos pendientes", "No hay archivos con error pendientes de validar.", {
+        showSectionValidationToast("Sin archivos corregidos", "Primero reemplaza el archivo desde el resumen. Sólo se validarán archivos que acabas de subir.", {
           type: "warning",
-          autoCloseMs: 4200
+          autoCloseMs: 5200
         });
         return false;
       }
@@ -1707,21 +1740,35 @@
           if (input) delete input.dataset.targetedRevalidate;
         }
 
-        const failed = failedLabelsFromPayload(data);
+        // Mezclar únicamente los resultados revalidados con el resumen existente.
+        // Así no se pierden ni se vuelven rojos los documentos que ya estaban aprobados.
+        const previousRows = latestReviewPayload?.results || [];
+        const updatedByField = new Map((data.results || []).map((row) => [row.fieldName, row]));
+        const mergedRows = previousRows.map((row) => updatedByField.get(row.fieldName) || row);
+        for (const row of data.results || []) {
+          if (!mergedRows.some((existing) => existing.fieldName === row.fieldName)) mergedRows.push(row);
+        }
+        latestReviewPayload = {
+          ...(latestReviewPayload || {}),
+          results: mergedRows,
+          summary: summarizeRowsForUi(mergedRows),
+        };
+        renderReviewSummary(latestReviewPayload);
+
+        const failed = failedLabelsFromPayload(latestReviewPayload);
         if (failed.length) {
           showSectionValidationToast("Aún hay correcciones", `Revisa: ${failed.slice(0, 4).join(", ")}.`, {
             type: "warning",
             autoCloseMs: 6500
           });
         } else {
-          showSectionValidationToast("Archivos corregidos", "Los archivos reemplazados fueron validados correctamente.", {
+          showSectionValidationToast("Archivos corregidos", "Sólo los archivos reemplazados fueron revalidados y quedaron actualizados.", {
             type: "success",
             autoCloseMs: 2800
           });
         }
 
-        await finalizePartialReviews({ silentLoading: true });
-        return data.summary?.canContinue !== false;
+        return latestReviewPayload.summary?.canContinue !== false;
       } catch (err) {
         const msg = friendlyErrorMessage(err, "No fue posible validar los archivos corregidos.");
         errEl.textContent = msg;
@@ -1885,8 +1932,8 @@
       if (text.includes("DUPLICATE_CURP") || text.includes("ya tiene un registro final") || text.includes("No se puede registrar de nuevo")) {
         return "Esta CURP ya tiene un registro final. No se puede registrar de nuevo.";
       }
-      if (text.includes("Unable to parse range")) return "No pudimos guardar el registro. Intenta de nuevo o avisa al equipo de SHIP.";
-      if (text.includes("GEMINI_API_KEY")) return "No pudimos revisar los documentos. Avisa al equipo de SHIP.";
+      if (text.includes("Unable to parse range")) return "No pudimos guardar el registro. Intenta de nuevo o avisa al equipo de soporte.";
+      if (text.includes("GEMINI_API_KEY")) return "No pudimos revisar los documentos. Avisa al equipo de soporte.";
       return text.length > 180 ? `${text.slice(0, 177)}...` : text;
     }
 
@@ -1941,9 +1988,14 @@
 
       if (status === "approved") return "Listo. Documento correcto.";
       if (status === "skipped") return "Opcional. No bloquea el registro.";
-      if (status === "missing") return "Falta subir este documento.";
-      if (status === "warning") return "Documento válido, pero requiere revisión.";
-      return "Necesita corrección. Sube este archivo otra vez.";
+      if (status === "missing") return detailForRow(row) || "Falta subir este documento.";
+
+      // Antes aquí se mostraba un texto genérico. Eso hacía imposible saber por qué
+      // un archivo visualmente correcto quedaba en rojo. Ahora mostramos el motivo
+      // real que regresa la IA/back-end: issues[], warnings[] o summary.
+      if (status === "warning" || status === "rejected") return detailForRow(row);
+
+      return detailForRow(row);
     }
 
     function markDraftFiles(filePaths = {}) {
@@ -2027,8 +2079,25 @@
       const form = document.getElementById("document-form");
       const fd = new FormData(form);
       const heavyFiles = [];
+      const replacementFields = new Set(reviewReplacementFilesByField.keys());
+
+      for (const [fieldName, file] of reviewReplacementFilesByField.entries()) {
+        fd.delete(fieldName);
+        if (!file) continue;
+
+        if ((file.size || 0) > AI_VALIDATION_MAX_FILE_BYTES) {
+          heavyFiles.push({
+            fieldName,
+            fileName: file.name || "archivo",
+            size: file.size || 0
+          });
+        } else {
+          fd.append(fieldName, file, file.name || fieldName);
+        }
+      }
 
       for (const input of form.querySelectorAll('input[type="file"][name]')) {
+        if (replacementFields.has(input.name)) continue;
         const file = (input.files || [])[0];
         if (!file) continue;
 
@@ -2044,6 +2113,12 @@
 
       if (heavyFiles.length) {
         fd.set("aiSkippedHeavyFiles", JSON.stringify(heavyFiles));
+      }
+
+      if (latestReviewPayload?.results?.length) {
+        try {
+          fd.set("clientReviewPayload", JSON.stringify(latestReviewPayload));
+        } catch (_) {}
       }
 
       fd.set("jobId", globalJobId);
@@ -2094,14 +2169,68 @@
       return row?.summary || "Documento aprobado.";
     }
 
+    function getReviewRoot() {
+      const form = document.getElementById("document-form");
+      if (!form) return null;
+
+      let root = document.getElementById("review-summary-root");
+      if (!root) {
+        root = document.createElement("div");
+        root.id = "review-summary-root";
+        root.className = "review-summary-root";
+      }
+
+      // El resumen debe vivir como hijo directo del form, fuera de cualquier .section.step.
+      // No usamos #err como referencia porque en algunas versiones está dentro del paso 4,
+      // y insertBefore falla si el nodo de referencia no es hijo directo del form.
+      if (root.parentElement !== form) {
+        const firstStep = form.querySelector(":scope > .section.step");
+        form.insertBefore(root, firstStep || null);
+      }
+
+      return root;
+    }
+
+    function relocateReviewBlocks() {
+      const root = getReviewRoot();
+      if (!root) return;
+
+      ["review-loading", "ai-review-screen"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.parentElement !== root) {
+          root.appendChild(el);
+        }
+      });
+    }
+
+    function ensureReviewAtTop() {
+      relocateReviewBlocks();
+      document.getElementById("ai-review-screen")?.classList.add("active");
+      document.body.classList.add("review-summary-mode");
+    }
+
+    function focusReviewSummary() {
+      const screen = document.getElementById("ai-review-screen");
+      requestAnimationFrame(() => {
+        screen?.scrollIntoView({ behavior: "smooth", block: "start" });
+        screen?.focus?.({ preventScroll: true });
+      });
+    }
+
     function renderReviewSummary(payload) {
-      latestReviewPayload = payload;
-      syncStepChecksFromPayload(payload);
+      const safePayload = payload && typeof payload === "object" ? payload : { summary: {}, results: [] };
+      relocateReviewBlocks();
 
       const screen = document.getElementById("ai-review-screen");
       const list = document.getElementById("review-list");
       const alert = document.getElementById("review-alert");
-      const rows = visibleReviewRows(payload.results || []).map(enrichRowWithHeavyFileState);
+      screen?.classList.add("active");
+      document.body.classList.add("review-summary-mode");
+
+      latestReviewPayload = safePayload;
+      syncStepChecksFromPayload(safePayload);
+      const rows = visibleReviewRows(safePayload.results || []).map(enrichRowWithHeavyFileState);
       latestReviewPayload = {
         ...(latestReviewPayload || {}),
         results: rows,
@@ -2149,7 +2278,7 @@
           : "";
 
         return `
-          <div class="review-item ${status}" data-field="${row.fieldName}">
+          <div class="review-item ${status} ${fieldsPendingTargetedRevalidation.has(row.fieldName) ? "pending-upload" : ""}" data-field="${row.fieldName}">
             <div class="review-icon">${iconForStatus(status)}</div>
             <div>
               <div class="review-item-title">${label}</div>
@@ -2161,6 +2290,7 @@
             <div class="review-item-actions">
               ${canUploadLighter ? `<button type="button" class="review-replace-btn" data-field="${row.fieldName}">Subir otro archivo</button>` : ""}
               ${canReplace ? `<button type="button" class="review-replace-btn" data-field="${row.fieldName}">${status === "warning" ? "Cambiar archivo" : "Reemplazar archivo"}</button>` : ""}
+              ${fieldsPendingTargetedRevalidation.has(row.fieldName) ? `<div class="review-inline-upload-note">Nuevo archivo listo: ${row.pendingFileName || "seleccionado"}</div>` : ""}
             </div>
           </div>
         `;
@@ -2259,7 +2389,7 @@
         resultBox.style.display = "";
         resultBox.innerHTML = `
           <strong>Registro enviado correctamente.</strong><br>
-          Gracias. Tu información fue guardada y será revisada por el equipo de SHIP.
+          Gracias. Tu información fue guardada y será revisada por el equipo de soporte.
         `;
 
         const toast = document.getElementById("draft-toast");
@@ -2352,8 +2482,13 @@
 
         loadedDraftCurp = data.curp || curp;
 
-        toast.textContent = `Avance guardado correctamente. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
-        showSuccess("Avance guardado", "Podrás continuar después ingresando tu CURP.");
+        if (data.credentialGenerated) {
+          toast.textContent = `Avance guardado y credencial generada. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
+          showSuccess("Avance guardado y credencial generada", "Se generó la credencial porque ya existen CURP, RFC, foto y NSS.");
+        } else {
+          toast.textContent = `Avance guardado correctamente. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
+          showSuccess("Avance guardado", "Podrás continuar después ingresando tu CURP. La credencial se generará cuando existan CURP, RFC, foto y NSS.");
+        }
         setTimeout(() => toast.classList.remove("active"), 8000);
       } catch (err) {
         const msg = friendlyErrorMessage(err, "No fue posible guardar el avance.");
@@ -2369,12 +2504,14 @@
       const note = document.getElementById("resume-note");
 
       if (!curp || curp.length < 18) {
+        setLandingMode("resume");
         note.textContent = "Ingresa una CURP válida de 18 caracteres.";
         showError("CURP inválida", "Ingresa una CURP de 18 caracteres.");
         return;
       }
 
       hardResetForm();
+      setLandingMode("resume");
       showAppModal("Buscando avance", "Estamos buscando tu registro y archivos guardados.", { type: "loading" });
 
       try {
@@ -2407,15 +2544,16 @@
           loadedDraftCurp = curp;
 
           showRegistrationInterface();
-          if (latestReviewPayload) {
-            showStep(4);
+          const hasLocalReviewRows = Array.isArray(latestReviewPayload?.results) && latestReviewPayload.results.length > 0;
+          if (hasLocalReviewRows) {
             renderReviewSummary(latestReviewPayload);
+            focusReviewSummary();
           } else {
             showStep(1);
           }
 
           note.textContent = "Avance cargado desde navegador. Si falta un archivo, vuelve a subirlo.";
-          showSuccess("Avance cargado", "Revisa el resumen y reemplaza únicamente lo que falte.");
+          showSuccess("Avance cargado", hasLocalReviewRows ? "Revisa el resumen y reemplaza únicamente lo que falte." : "No había resumen guardado; revisa los datos del expediente.");
           return;
         }
 
@@ -2443,16 +2581,25 @@
 
         showRegistrationInterface();
 
-        if (latestReviewPayload) {
-          showStep(4);
+        const hasReviewRows = Array.isArray(latestReviewPayload?.results) && latestReviewPayload.results.length > 0;
+        const hasRecoveredFiles = Object.keys(filePaths || {}).length > 0;
+
+        if (hasReviewRows) {
           renderReviewSummary(latestReviewPayload);
+          focusReviewSummary();
+          note.textContent = "Avance cargado correctamente.";
+          showSuccess("Avance cargado", "Revisa el resumen y corrige sólo lo marcado.");
+        } else if (hasRecoveredFiles) {
+          note.textContent = "Avance cargado correctamente. Estamos reconstruyendo el resumen con los archivos recuperados.";
+          showSectionValidationToast("Validando avance recuperado", "No había resumen guardado; se revisarán los archivos recuperados para mostrarlo nuevamente.", {
+            type: "loading"
+          });
+          await runFinalAiReview();
         } else {
           showStep(1);
+          note.textContent = "Avance cargado correctamente, pero no encontramos archivos guardados para mostrar resumen.";
+          showSuccess("Avance cargado", "Revisa los datos del expediente y continúa el registro.");
         }
-
-        note.textContent = "Avance cargado correctamente.";
-
-        showSuccess("Avance cargado", "Revisa el resumen y corrige sólo lo marcado.");
       } catch (e) {
         const msg = friendlyErrorMessage(e, "No fue posible cargar el avance.");
         note.textContent = msg;
@@ -2502,7 +2649,7 @@
       try {
         el.focus({ preventScroll: true });
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-      } catch (_) { }
+      } catch (_) {}
       return false;
     }
 
@@ -2615,6 +2762,9 @@
     }
 
     function showStep(n) {
+      document.body.classList.remove("review-summary-mode");
+      document.getElementById("ai-review-screen")?.classList.remove("active");
+      document.getElementById("review-loading")?.classList.remove("active");
       if (Number(n) === 3 && !isVehicleStepRequired()) n = 4;
       document.querySelectorAll(".step").forEach((s) => {
         s.classList.toggle("active", Number(s.dataset.step) === Number(n));
@@ -2626,7 +2776,7 @@
 
       try {
         document.querySelector(".right-panel")?.scrollTo({ top: 0, behavior: "smooth" });
-      } catch (_) { }
+      } catch (_) {}
     }
 
     function applyClabeMode(mode) {
@@ -2706,6 +2856,7 @@
     }
 
     function hardResetForm() {
+      document.body.classList.remove("review-summary-mode");
       const form = document.getElementById("document-form");
       if (!form) return;
 
@@ -2722,9 +2873,20 @@
       document.getElementById("archive-result") && (document.getElementById("archive-result").style.display = "none");
       latestReviewPayload = null;
       loadedDraftCurp = "";
+      reviewReplacementFilesByField.clear();
       const vacancyInput = document.getElementById("tipo_vacante");
       if (vacancyInput) vacancyInput.value = "";
       document.getElementById("vacancy-box")?.classList.remove("active");
+      document.getElementById("resume-box")?.classList.remove("active");
+      document.getElementById("landing-panel-vacancy")?.setAttribute("hidden", "");
+      document.getElementById("landing-panel-resume")?.setAttribute("hidden", "");
+      document.getElementById("landing-placeholder")?.removeAttribute("hidden");
+      document.getElementById("new-registration-btn")?.classList.remove("is-selected");
+      document.getElementById("show-resume-btn")?.classList.remove("is-selected");
+      document.getElementById("new-registration-btn")?.setAttribute("aria-selected", "false");
+      document.getElementById("show-resume-btn")?.setAttribute("aria-selected", "false");
+      const resumeCurpInput = document.getElementById("resume-curp");
+      if (resumeCurpInput) resumeCurpInput.value = "";
       document.querySelectorAll("[data-vacancy]").forEach((btn) => btn.classList.remove("active"));
       resetPartialValidationState();
       resetPartialValidationState();
@@ -2770,10 +2932,7 @@
     }
 
     function validateStep2() {
-      const vacancy = selectedVacancy() || "driver";
-      const requiredIds = ["ine_frontal", "ine_reverso", "curp", "acta", "comprobante", "constancia"]
-        .filter((id) => !(vacancy === "driver" && id === "acta"));
-
+      const requiredIds = ["ine_frontal", "ine_reverso", "curp", "acta", "comprobante", "constancia"];
       for (const id of requiredIds) {
         const el = document.getElementById(id);
         if (el && !el.disabled && !el.files?.length && !loadedDraftCurp) {
@@ -2889,10 +3048,11 @@
     applyNssMode(document.querySelector('input[name="nss_mode"]:checked')?.value || "archivo");
 
 
-
+    
     function resetForNextDriver() {
       hardResetForm();
       document.body.classList.add("pre-registration");
+      setLandingMode(null);
       const resumeCard = document.getElementById("resume-card");
       if (resumeCard) {
         resumeCard.style.display = "";
@@ -2903,7 +3063,7 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    function showRegistrationInterface() {
+function showRegistrationInterface() {
       document.body.classList.remove("pre-registration");
       const resumeCard = document.getElementById("resume-card");
       if (resumeCard) resumeCard.style.display = "none";
@@ -2911,87 +3071,157 @@
       errEl.textContent = "";
     }
 
-    document.querySelectorAll('input[type="file"]').forEach(input => {
-      input.addEventListener("change", function () {
-        const f = (this.files || [])[0];
-        if (!f) return;
-        clearRecoveredFileControl(this);
-        if (this.dataset.targetedRevalidate === "1" || document.getElementById("ai-review-screen")?.classList.contains("active")) {
-          markFieldForTargetedRevalidation(this.name);
-          delete partialValidationByField[this.name];
-          setFileStatus(this, "selected", `Archivo corregido: ${shortFileName(f.name)}`, "Sólo este archivo se validará de nuevo desde el resumen.");
-        } else {
-          invalidateStep(fieldStep(this.name));
-          setFileStatus(this, "selected", `Archivo seleccionado: ${shortFileName(f.name)}`, "Lo revisaremos al continuar este paso.");
-        }
-      });
-    });
-    document.getElementById("resume-curp")?.addEventListener("input", (e) => {
-      e.target.value = normalizeCurp(e.target.value);
-    });
+    function handleFileInputSelection(input, options = {}) {
+      const f = options.fileOverride || (input?.files || [])[0];
+      if (!input || !f) return;
 
-    function clearStartPanelMode() {
-      document.getElementById("vacancy-box")?.classList.remove("active");
-      document.getElementById("resume-box")?.classList.remove("active");
-      document.getElementById("new-registration-btn")?.classList.remove("active");
-      document.getElementById("show-resume-btn")?.classList.remove("active");
-    }
+      const fromSummary = options.fromSummary === true
+        || input.dataset.targetedRevalidate === "1"
+        || document.body.classList.contains("review-summary-mode")
+        || document.getElementById("ai-review-screen")?.classList.contains("active");
 
-    function setStartPanelMode(mode) {
-      const vacancyBox = document.getElementById("vacancy-box");
-      const resumeBox = document.getElementById("resume-box");
-      const newBtn = document.getElementById("new-registration-btn");
-      const resumeBtn = document.getElementById("show-resume-btn");
-      const note = document.getElementById("resume-note");
+      clearRecoveredFileControl(input);
 
-      const isNewOpen = vacancyBox?.classList.contains("active");
-      const isResumeOpen = resumeBox?.classList.contains("active");
+      if (fromSummary) {
+        reviewReplacementFilesByField.set(input.name, f);
+        input.dataset.targetedRevalidate = "1";
+        markFieldForTargetedRevalidation(input.name);
+        delete partialValidationByField[input.name];
 
-      hardResetForm();
-      clearStartPanelMode();
-      latestReviewPayload = null;
-      loadedDraftCurp = "";
-      document.getElementById("ai-review-screen")?.classList.remove("active");
-
-      if (mode === "new") {
-        if (isNewOpen) {
-          if (note) note.textContent = "Selecciona una opción para iniciar o recuperar tu registro.";
-          return;
+        if (latestReviewPayload?.results) {
+          latestReviewPayload.results = latestReviewPayload.results.map((row) =>
+            row.fieldName === input.name ? { ...row, pendingFileName: shortFileName(f.name) } : row
+          );
         }
 
-        vacancyBox?.classList.add("active");
-        newBtn?.classList.add("active");
-        if (note) note.textContent = "Selecciona la vacante para aplicar las reglas documentales.";
+        setFileStatus(input, "selected", `Archivo corregido: ${shortFileName(f.name)}`, "Sólo este archivo se validará de nuevo desde el resumen.");
+
+        if (latestReviewPayload) {
+          renderReviewSummary(latestReviewPayload);
+          ensureReviewAtTop();
+          focusReviewSummary();
+        }
         return;
       }
 
-      if (mode === "resume") {
-        if (isResumeOpen) {
-          if (note) note.textContent = "Selecciona una opción para iniciar o recuperar tu registro.";
+      reviewReplacementFilesByField.delete(input.name);
+      invalidateStep(fieldStep(input.name));
+      setFileStatus(input, "selected", `Archivo seleccionado: ${shortFileName(f.name)}`, "Lo revisaremos al continuar este paso.");
+    }
+
+    function openReviewReplacementPicker(field) {
+      const input = document.querySelector(`input[type="file"][name="${CSS.escape(field)}"]`);
+      if (!input) return;
+
+      input.dataset.targetedRevalidate = "1";
+      markFieldForTargetedRevalidation(field);
+      ensureReviewAtTop();
+
+      const picker = document.createElement("input");
+      picker.type = "file";
+      picker.accept = input.getAttribute("accept") || ".pdf,.jpg,.jpeg,.png";
+      picker.setAttribute("aria-hidden", "true");
+      picker.style.position = "fixed";
+      picker.style.left = "-10000px";
+      picker.style.top = "0";
+      picker.style.width = "1px";
+      picker.style.height = "1px";
+      picker.style.opacity = "0";
+
+      picker.addEventListener("change", () => {
+        const file = (picker.files || [])[0];
+        if (!file) {
+          picker.remove();
+          ensureReviewAtTop();
+          focusReviewSummary();
           return;
         }
 
-        resumeBox?.classList.add("active");
-        resumeBtn?.classList.add("active");
-        const curpInput = document.getElementById("resume-curp");
-        if (curpInput) setTimeout(() => curpInput.focus(), 50);
-        if (note) note.textContent = "Ingresa tu CURP para recuperar tu avance.";
+        reviewReplacementFilesByField.set(field, file);
+
+        try {
+          if (typeof DataTransfer !== "undefined") {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files;
+          }
+        } catch (_) {
+          // Aunque el navegador no permita asignar FileList, el archivo queda
+          // resguardado en reviewReplacementFilesByField y se adjunta al FormData.
+        }
+
+        handleFileInputSelection(input, { fromSummary: true, fileOverride: file });
+        picker.remove();
+      }, { once: true });
+
+      document.body.appendChild(picker);
+      picker.click();
+    }
+
+    document.querySelectorAll('input[type="file"]').forEach(input => {
+      input.addEventListener("change", function () {
+        handleFileInputSelection(this);
+      });
+    });
+document.getElementById("resume-curp")?.addEventListener("input", (e) => {
+      e.target.value = normalizeCurp(e.target.value);
+    });
+
+    function setLandingMode(mode) {
+      const vacancyBox = document.getElementById("vacancy-box");
+      const resumeBox = document.getElementById("resume-box");
+      const panelVacancy = document.getElementById("landing-panel-vacancy");
+      const panelResume = document.getElementById("landing-panel-resume");
+      const placeholder = document.getElementById("landing-placeholder");
+      const newBtn = document.getElementById("new-registration-btn");
+      const resumeBtn = document.getElementById("show-resume-btn");
+      const isNew = mode === "new";
+      const isResume = mode === "resume";
+
+      vacancyBox?.classList.toggle("active", isNew);
+      resumeBox?.classList.toggle("active", isResume);
+      newBtn?.classList.toggle("active", isNew);
+      resumeBtn?.classList.toggle("active", isResume);
+      newBtn?.classList.toggle("is-selected", isNew);
+      resumeBtn?.classList.toggle("is-selected", isResume);
+      newBtn?.setAttribute("aria-selected", isNew ? "true" : "false");
+      resumeBtn?.setAttribute("aria-selected", isResume ? "true" : "false");
+
+      if (isNew) {
+        panelVacancy?.removeAttribute("hidden");
+        panelResume?.setAttribute("hidden", "");
+        placeholder?.setAttribute("hidden", "");
+      } else if (isResume) {
+        panelResume?.removeAttribute("hidden");
+        panelVacancy?.setAttribute("hidden", "");
+        placeholder?.setAttribute("hidden", "");
+        document.getElementById("resume-curp")?.focus();
+      } else {
+        panelVacancy?.setAttribute("hidden", "");
+        panelResume?.setAttribute("hidden", "");
+        placeholder?.removeAttribute("hidden");
       }
     }
 
     document.getElementById("show-resume-btn")?.addEventListener("click", () => {
-      setStartPanelMode("resume");
+      hardResetForm();
+      setLandingMode("resume");
     });
 
     document.getElementById("new-registration-btn")?.addEventListener("click", () => {
-      setStartPanelMode("new");
+      hardResetForm();
+      latestReviewPayload = null;
+      loadedDraftCurp = "";
+      document.getElementById("ai-review-screen")?.classList.remove("active");
+      setLandingMode("new");
     });
 
     document.querySelectorAll("[data-vacancy]").forEach((btn) => {
       btn.addEventListener("click", () => {
         hardResetForm();
         const vacancy = applyVacancyRules(btn.dataset.vacancy);
-        clearStartPanelMode();
+        document.getElementById("vacancy-box")?.classList.add("active");
+        setLandingMode("new");
         showRegistrationInterface();
         showStep(1);
         showSuccess("Vacante seleccionada", `Aplicarás como ${VACANCY_LABELS[vacancy] || vacancy}.`);
@@ -3017,17 +3247,12 @@
       const input = document.querySelector(`input[type="file"][name="${CSS.escape(field)}"]`);
       if (!input) return;
 
-      input.dataset.targetedRevalidate = "1";
-      markFieldForTargetedRevalidation(field);
-      const step = input.closest(".step")?.dataset?.step;
-      if (step) showStep(Number(step));
-
-      setTimeout(() => {
-        input.scrollIntoView({ behavior: "smooth", block: "center" });
-        input.click();
-      }, 250);
+      // Abrimos un selector temporal fuera del formulario para que el navegador
+      // no enfoque ni desplace la pantalla al paso original del documento.
+      openReviewReplacementPicker(field);
     });
 
+    relocateReviewBlocks();
     updateProgress(1);
   </script>
 

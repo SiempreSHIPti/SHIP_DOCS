@@ -77,6 +77,8 @@ const HEADER_DEFINITIONS = [
   ["licenciaPath", "Ruta licencia"],
   ["tarjetaPath", "Ruta tarjeta circulación"],
   ["polizaPath", "Ruta póliza seguro"],
+  ["rejectedDetail", "Detalle documentos rechazados"],
+  ["warningsDetail", "Detalle documentos con observación"],
   ["credentialPdfPath", "Ruta credencial PDF"],
   ["excelPath", "Ruta Excel"],
   ["reviewJson", "Resumen revisión IA JSON"],
@@ -275,7 +277,58 @@ function normalizeRfc(value) {
 function normalizeNss(value) {
   const text = String(value || "");
   const match = text.match(/\b\d{11}\b/);
-  return match ? match[0] : text.replace(/\D/g, "").slice(0, 11);
+  if (match) return match[0];
+  const digits = text.replace(/\D/g, "");
+  if (digits.length >= 11) return digits.slice(0, 11);
+  // En NSS reales puede existir cero inicial; si IA lo cortó y quedan 10 dígitos, lo restauramos.
+  if (digits.length === 10) return `0${digits}`;
+  return digits.slice(0, 11);
+}
+
+function reviewRowLabel(row = {}) {
+  return row.label || FIELD_LABELS?.[row.fieldName] || row.fieldName || "Documento";
+}
+
+function reviewRowReasons(row = {}) {
+  const parts = [
+    row.summary,
+    ...(Array.isArray(row.issues) ? row.issues : []),
+    ...(Array.isArray(row.warnings) ? row.warnings : []),
+  ]
+    .filter(Boolean)
+    .map((x) => String(x).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  return [...new Set(parts)].slice(0, 2).join(" | ");
+}
+
+
+function documentNamesByStatus(reviewPayload = {}, kind = "rejected") {
+  const rows = Array.isArray(reviewPayload?.results) ? reviewPayload.results : [];
+  return [...new Set(rows.filter((row) => {
+    const status = String(row?.status || "").toLowerCase();
+    const severity = String(row?.severity || "").toLowerCase();
+    if (kind === "rejected") return row?.ok === false || status === "rejected" || status === "missing" || severity === "error";
+    if (kind === "warning") return status === "warning" || severity === "warning";
+    return false;
+  }).map(reviewRowLabel))].join(", ");
+}
+
+function detailRowsByStatus(reviewPayload = {}, kind = "rejected") {
+  const rows = Array.isArray(reviewPayload?.results) ? reviewPayload.results : [];
+  return rows
+    .filter((row) => {
+      const status = String(row?.status || "").toLowerCase();
+      const severity = String(row?.severity || "").toLowerCase();
+      if (kind === "rejected") return row?.ok === false || status === "rejected" || status === "missing" || severity === "error";
+      if (kind === "warning") return status === "warning" || severity === "warning";
+      return false;
+    })
+    .map((row) => {
+      const reason = reviewRowReasons(row);
+      return reason ? `${reviewRowLabel(row)}: ${reason}` : reviewRowLabel(row);
+    })
+    .join("\n");
 }
 
 function normalizeBody(body = {}, reviewPayload = {}) {
@@ -751,10 +804,12 @@ async function appendExcelRow({ jobId, credentialId, bodyData, filePaths, creden
     ref2Tel: bodyData.ref2Tel,
     aiStatus: summary.canContinue ? (summary.warnings ? "APROBADO_CON_OBSERVACIONES" : "APROBADO") : "CON_ERRORES",
     aiApproved: summary.approved || 0,
-    aiRejected: summary.rejected || 0,
-    aiWarnings: summary.warnings || 0,
+    aiRejected: documentNamesByStatus(reviewPayload, "rejected"),
+    aiWarnings: documentNamesByStatus(reviewPayload, "warning"),
     aiMissing: summary.missing || 0,
     aiSkipped: summary.skipped || 0,
+    rejectedDetail: detailRowsByStatus(reviewPayload, "rejected"),
+    warningsDetail: detailRowsByStatus(reviewPayload, "warning"),
     credentialPdfPath: credentialPdf.relativePath,
     excelPath: path.relative(process.cwd(), xlsxPath),
     reviewJson: JSON.stringify(reviewPayload || {}),

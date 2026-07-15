@@ -21,6 +21,23 @@ function hasBoundary(req) {
   return typeof ct === "string" && ct.includes("multipart/form-data") && ct.includes("boundary=");
 }
 
+
+function parseClientReviewPayload(value) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(String(value));
+    if (!parsed?.summary || !Array.isArray(parsed?.results)) return null;
+    return {
+      summary: parsed.summary,
+      results: parsed.results,
+      reviewedAt: parsed.reviewedAt || new Date().toISOString(),
+      source: parsed.source || "client_review_payload",
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
 function processUploadMiddleware(req, res, next) {
   const ct = req.headers["content-type"];
   if (typeof ct === "string" && ct.includes("multipart/form-data") && !hasBoundary(req)) {
@@ -41,7 +58,7 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
   if (!jobId) return res.status(400).json({ ok: false, error: "Falta jobId." });
 
   const job = getJob(jobId) || {};
-  const finalReview = job.data?.finalReview || null;
+  const finalReview = job.data?.finalReview || parseClientReviewPayload(req.body.clientReviewPayload) || null;
 
   if (!finalReview?.summary) {
     return res.status(400).json({
