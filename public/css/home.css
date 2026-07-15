@@ -699,7 +699,7 @@ body.pre-registration #resume-card h3 {
 }
 
 .progress-step.validating span::after {
-  content: " validando";
+  content: "";
   color: #ff6b7b;
   font-size: 10px;
   margin-left: 4px;
