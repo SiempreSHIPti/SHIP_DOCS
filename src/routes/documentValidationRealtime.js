@@ -4,6 +4,7 @@ const { upload, validateUploadedFiles } = require("../middleware/upload");
 const { setJob, getJob } = require("../services/jobStore");
 const { validateDocument, DOC_RULES } = require("../services/documentValidation");
 const { toUpperClean, digitsOnly } = require("../utils/strings");
+const { friendlyPayload, friendlyValidationIssue } = require("../utils/friendlyErrors");
 
 const router = express.Router();
 
@@ -31,13 +32,13 @@ function hasBoundary(req) {
 function processUploadMiddleware(req, res, next) {
   const ct = req.headers["content-type"];
   if (typeof ct === "string" && ct.includes("multipart/form-data") && !hasBoundary(req)) {
-    return res.status(400).json({ ok: false, error: "multipart/form-data inválido" });
+    return res.status(400).json(friendlyPayload(new Error("multipart/form-data inválido"), "No se recibió el archivo."));
   }
 
   uploadFields(req, res, (err) => {
     if (err) {
       console.error("[/api/document-validation/realtime] Multer error:", err);
-      return res.status(400).json({ ok: false, error: `Error leyendo archivo: ${err.message}` });
+      return res.status(400).json(friendlyPayload(err, "No pudimos leer el archivo enviado."));
     }
     validateUploadedFiles(req, res, next);
   });
@@ -53,12 +54,12 @@ router.post("/api/document-validation/realtime", processUploadMiddleware, async 
   const nombre = toUpperClean(req.body.nombre);
   const telefono = digitsOnly(req.body.telefono).slice(0, 10);
 
-  if (!jobId) return res.status(400).json({ ok: false, error: "Falta jobId." });
-  if (!fieldName) return res.status(400).json({ ok: false, error: "Falta fieldName." });
-  if (!DOC_RULES[fieldName]) return res.status(400).json({ ok: false, error: `Documento no soportado: ${fieldName}` });
+  if (!jobId) return res.status(400).json(friendlyPayload(new Error("Falta jobId."), "No se pudo continuar con la validación."));
+  if (!fieldName) return res.status(400).json(friendlyPayload(new Error("Falta fieldName."), "No se pudo identificar qué documento validar."));
+  if (!DOC_RULES[fieldName]) return res.status(400).json(friendlyPayload(new Error(`Documento no soportado: ${fieldName}`), "No se pudo validar este documento."));
 
   const file = getUploadedFile(req, fieldName);
-  if (!file?.buffer) return res.status(400).json({ ok: false, error: "No se recibió archivo para validar." });
+  if (!file?.buffer) return res.status(400).json(friendlyPayload(new Error("No se recibió archivo para validar."), "No recibimos el archivo para validar."));
 
   const currentJob = getJob(jobId) || {};
   const currentData = currentJob.data || {};
@@ -132,16 +133,21 @@ router.post("/api/document-validation/realtime", processUploadMiddleware, async 
       result: finalResult
     });
   } catch (err) {
-    const message = err?.response?.data?.error?.message || err?.message || "Error validando documento con IA.";
+    const label = DOC_RULES[fieldName].label;
+    const payload = friendlyPayload(err, `No se pudo validar ${label}.`);
+    const message = payload.userMessage || payload.error;
 
     const errorResult = {
       fieldName,
-      label: DOC_RULES[fieldName].label,
+      label,
       ok: false,
       status: "rejected",
+      severity: "error",
       recommendation: "reject",
-      issues: [message],
-      summary: "No se pudo validar el documento con IA.",
+      issues: [friendlyValidationIssue(message, label)],
+      summary: message,
+      userMessage: message,
+      errorCode: payload.code,
       validatedAt: new Date().toISOString()
     };
 
@@ -170,7 +176,11 @@ router.post("/api/document-validation/realtime", processUploadMiddleware, async 
       jobId,
       fieldName,
       result: errorResult,
-      error: message
+      error: message,
+      userMessage: message,
+      code: payload.code,
+      cause: payload.cause,
+      action: payload.action
     });
   }
 });

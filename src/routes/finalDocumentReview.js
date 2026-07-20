@@ -7,6 +7,7 @@ const { toUpperClean, digitsOnly } = require("../utils/strings");
 const { getDraftFile, getCurpFromReview, findCompletedRegistration } = require("../services/localDraftStore");
 const { ENV } = require("../config/env");
 const { findFinalRegistrationByCurp } = require("../services/googleArchive");
+const { friendlyPayload, friendlyValidationIssue } = require("../utils/friendlyErrors");
 
 const router = express.Router();
 const AI_VALIDATION_MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -46,6 +47,15 @@ const FIELD_LABELS = {
   poliza: "Póliza de seguro",
 };
 
+
+
+function duplicateCurpPayload(curp, duplicate) {
+  return friendlyPayload(
+    Object.assign(new Error(`La CURP ${curp} ya tiene un registro final. No se puede registrar de nuevo.`), { code: "DUPLICATE_CURP" }),
+    "Esta CURP ya tiene un registro final.",
+    { duplicateRegistered: true, duplicate }
+  );
+}
 
 function parseHeavySkippedFiles(value) {
   if (!value) return new Map();
@@ -169,13 +179,13 @@ function hasBoundary(req) {
 function processUploadMiddleware(req, res, next) {
   const ct = req.headers["content-type"];
   if (typeof ct === "string" && ct.includes("multipart/form-data") && !hasBoundary(req)) {
-    return res.status(400).json({ ok: false, error: "multipart/form-data inválido" });
+    return res.status(400).json(friendlyPayload(new Error("multipart/form-data inválido"), "No se recibieron los archivos."));
   }
 
   uploadFields(req, res, (err) => {
     if (err) {
       console.error("[/api/registration/final-review] Multer error:", err);
-      return res.status(400).json({ ok: false, error: `Error leyendo archivos: ${err.message}` });
+      return res.status(400).json(friendlyPayload(err, "No pudimos leer los archivos enviados."));
     }
     validateUploadedFiles(req, res, next);
   });
@@ -338,32 +348,38 @@ function buildSkippedResult(fieldName, reason) {
 }
 
 function buildMissingResult(fieldName) {
+  const label = FIELD_LABELS[fieldName] || fieldName;
+  const message = friendlyValidationIssue("Documento faltante. Debes subir este archivo para completar el registro.", label);
   return {
     fieldName,
-    label: FIELD_LABELS[fieldName] || fieldName,
+    label,
     ok: false,
     status: "missing",
+    severity: "error",
     recommendation: "reject",
-    issues: ["Documento faltante. Debes subir este archivo para completar el registro."],
-    summary: "No se recibió archivo.",
+    issues: [message],
+    summary: message,
     missing: true,
+    userMessage: message,
   };
 }
 
 function buildErrorResult(fieldName, err) {
-  const message =
-    err?.response?.data?.error?.message ||
-    err?.message ||
-    "Error validando documento con IA.";
+  const label = FIELD_LABELS[fieldName] || fieldName;
+  const payload = friendlyPayload(err, `No se pudo validar ${label}.`);
+  const message = payload.userMessage || payload.error;
 
   return {
     fieldName,
-    label: FIELD_LABELS[fieldName] || fieldName,
+    label,
     ok: false,
     status: "rejected",
+    severity: "error",
     recommendation: "reject",
     issues: [message],
-    summary: "No se pudo validar el documento con IA.",
+    summary: message,
+    userMessage: message,
+    errorCode: payload.code,
   };
 }
 
@@ -722,7 +738,7 @@ function summarize(results) {
 
 router.post("/api/registration/final-review", processUploadMiddleware, async (req, res) => {
   const jobId = String(req.body.jobId || "").trim();
-  if (!jobId) return res.status(400).json({ ok: false, error: "Falta jobId." });
+  if (!jobId) return res.status(400).json(friendlyPayload(new Error("Falta jobId."), "No se pudo continuar con el formulario."));
 
   const body = req.body || {};
   const nombreOriginal = toUpperClean(body.nombre);
@@ -772,26 +788,14 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
       if (!useGoogleArchiveAsRegistry()) {
         const localDuplicate = await findCompletedRegistration(detectedCurp);
         if (localDuplicate) {
-          return res.status(409).json({
-            ok: false,
-            duplicateRegistered: true,
-            code: "DUPLICATE_CURP",
-            error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
-            duplicate: localDuplicate,
-          });
+          return res.status(409).json(duplicateCurpPayload(detectedCurp, localDuplicate));
         }
       }
 
       if (useGoogleArchiveAsRegistry()) {
         const googleDuplicate = await findFinalRegistrationByCurp(detectedCurp);
         if (googleDuplicate) {
-          return res.status(409).json({
-            ok: false,
-            duplicateRegistered: true,
-            code: "DUPLICATE_CURP",
-            error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
-            duplicate: googleDuplicate,
-          });
+          return res.status(409).json(duplicateCurpPayload(detectedCurp, googleDuplicate));
         }
       }
     }
@@ -912,26 +916,14 @@ router.post("/api/registration/final-review", processUploadMiddleware, async (re
     if (!useGoogleArchiveAsRegistry()) {
       const localDuplicate = await findCompletedRegistration(detectedCurp);
       if (localDuplicate) {
-        return res.status(409).json({
-          ok: false,
-          duplicateRegistered: true,
-          code: "DUPLICATE_CURP",
-          error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
-          duplicate: localDuplicate,
-        });
+        return res.status(409).json(duplicateCurpPayload(detectedCurp, localDuplicate));
       }
     }
 
     if (useGoogleArchiveAsRegistry()) {
       const googleDuplicate = await findFinalRegistrationByCurp(detectedCurp);
       if (googleDuplicate) {
-        return res.status(409).json({
-          ok: false,
-          duplicateRegistered: true,
-          code: "DUPLICATE_CURP",
-          error: `La CURP ${detectedCurp} ya tiene un registro final. No se puede registrar de nuevo.`,
-          duplicate: googleDuplicate,
-        });
+        return res.status(409).json(duplicateCurpPayload(detectedCurp, googleDuplicate));
       }
     }
   }

@@ -3,6 +3,7 @@ const express = require("express");
 const path = require("path");
 const { ENV } = require("./config/env");
 const { securityHeaders, rateLimit } = require("./middleware/security");
+const { friendlyPayload } = require("./utils/friendlyErrors");
 
 const { submitRouter } = require("./routes/submit");
 const { jobStatusRouter } = require("./routes/jobStatus");
@@ -96,6 +97,18 @@ function buildApp() {
     realtimeValidationEnabled: false,
     resumeByCurpEnabled: true
   }));
+
+  app.use((err, req, res, _next) => {
+    console.error("[global-error-handler]", {
+      method: req.method,
+      path: req.path,
+      code: err?.code,
+      message: err?.message,
+    });
+
+    const status = err?.status || err?.statusCode || (err?.code === "DUPLICATE_CURP" ? 409 : 400);
+    return res.status(status).json(friendlyPayload(err, "No fue posible procesar la solicitud."));
+  });
 
   return app;
 }

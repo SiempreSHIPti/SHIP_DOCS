@@ -44,8 +44,8 @@ const SHEETS_HEADERS = [
   "CURP",
   "Estado revisión IA",
   "Docs aprobados",
-  "Docs rechazados",
-  "Docs con observación",
+  "Documentos rechazados",
+  "Documentos con observación",
   "Docs faltantes",
   "Docs omitidos",
   "Carpeta Drive",
@@ -219,30 +219,88 @@ function extractRfcFromReview(reviewPayload = {}) {
   return normalizeRfc(text.match(/\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b/)?.[1] || "");
 }
 
-function isNameValidatedWithIne(reviewPayload = {}) {
-  return (reviewPayload?.results || [])
-    .filter((row) => ["ine_frontal", "ine_reverso"].includes(row?.fieldName))
-    .some((row) => (row?.ok === true || String(row?.status || "").toLowerCase() === "approved")
-      && row?.ownerMatchesDriver !== false && row?.nameMatches !== false);
+function normalizeNameForCredential(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-ZÑ\s]/g, " ")
+    .replace(/\b(DE|DEL|LA|LAS|LOS|Y|DA|DAS|DOS)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function nameSimilarityForCredential(expected, found) {
+  const expectedTokens = normalizeNameForCredential(expected).split(" ").filter((token) => token.length > 2);
+  const foundTokens = new Set(normalizeNameForCredential(found).split(" ").filter((token) => token.length > 2));
+  if (!expectedTokens.length || !foundTokens.size) return 0;
+  const hits = expectedTokens.filter((token) => foundTokens.has(token)).length;
+  return hits / expectedTokens.length;
+}
+
+function findReviewRow(reviewPayload = {}, fieldName) {
+  return (reviewPayload?.results || []).find((row) => row?.fieldName === fieldName) || null;
+}
+
+function isReviewRowApproved(row) {
+  if (!row) return false;
+  const status = String(row.status || "").toLowerCase();
+  const severity = String(row.severity || "").toLowerCase();
+  return row.ok === true && status !== "rejected" && status !== "missing" && severity !== "error";
+}
+
+function isNameValidated(row, expectedName) {
+  if (!isReviewRowApproved(row)) return false;
+  if (row.nameMatches === true || row.accentInsensitiveNameMatch === true) return true;
+  if (Number(row.nameSimilarity || 0) >= 0.68) return true;
+  return nameSimilarityForCredential(expectedName, row.nameFound) >= 0.68;
+}
+
+function selfieIsValidForCredential(row) {
+  if (!isReviewRowApproved(row)) return false;
+  const verification = row.selfieVerification || {};
+  if (verification.isRealPerson === false) return false;
+  if (verification.isDirectCameraCapture === false) return false;
+  if (verification.isScreenRecapture === true) return false;
+  if (verification.isPrintedPhoto === true) return false;
+  if (verification.isPhotoOfPhoto === true) return false;
+  if (verification.screenOrDeviceDetected === true) return false;
+  if (Number.isFinite(Number(verification.faceCount)) && Number(verification.faceCount) !== 1) return false;
+  return true;
 }
 
 function getDraftCredentialReadiness({ bodyData = {}, reviewPayload = {}, googleFiles = {}, curp = "" } = {}) {
   const nombre = String(bodyData.nombre || "").trim();
   const nss = normalizeNssForSheet(bodyData.nssNum || bodyData.nss_num || extractNssFromReview(reviewPayload));
   const rfc = normalizeRfc(bodyData.rfc || extractRfcFromReview(reviewPayload));
-  const curpValue = normalizeCurpForLookup(bodyData.curpTxt) || normalizeCurpForLookup(bodyData.curp_txt) || normalizeCurpForLookup(curp);
+  const curpValue = normalizeCurpForLookup(bodyData.curpTxt || bodyData.curp_txt || curp);
   const selfieLink = googleFiles.selfie?.webViewLink || "";
+
+  const ineRow = findReviewRow(reviewPayload, "ine_frontal");
+  const curpRow = findReviewRow(reviewPayload, "curp");
+  const selfieRow = findReviewRow(reviewPayload, "selfie");
 
   const missing = [];
   if (!nombre) missing.push("nombre");
-  if (!curpValue) missing.push("curp");
+  if (curpValue.length !== 18) missing.push("curp");
   if (!/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc)) missing.push("rfc");
   if (nss.length !== 11) missing.push("nss");
-  if (!selfieLink) missing.push("foto");
+  if (!isNameValidated(ineRow, nombre)) missing.push("nombre validado con INE");
+  if (!isNameValidated(curpRow, nombre)) missing.push("nombre validado con CURP");
+  if (!selfieLink) {
+    missing.push("foto");
+  } else if (!selfieIsValidForCredential(selfieRow)) {
+    missing.push("foto personal validada como persona real");
+  }
 
   return {
     ready: missing.length === 0,
     missing,
+    evidence: {
+      ineValidated: isNameValidated(ineRow, nombre),
+      curpValidated: isNameValidated(curpRow, nombre),
+      selfieValidated: selfieIsValidForCredential(selfieRow),
+    },
     row: {
       nombre,
       puesto: normalizeVacancyType(bodyData.tipoVacante || bodyData.tipo_vacante || bodyData.vacante) || ENV.PUESTO_DEFAULT || "OPERADOR",
@@ -302,11 +360,8 @@ function isEnabled() {
   return ENV.GOOGLE_ARCHIVE_ENABLED === true || ENV.GOOGLE_ARCHIVE_ENABLED === "true";
 }
 
-const CURP_REGEX = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
-
 function normalizeCurpForLookup(value) {
-  const normalized = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 18);
-  return CURP_REGEX.test(normalized) ? normalized : "";
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 18);
 }
 
 function safeName(value, fallback = "SIN_NOMBRE") {
@@ -700,7 +755,7 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
     asSheetText(clabe),
     asSheetText(nss),
     rfc,
-    normalizeCurpForLookup(bodyData.curpTxt) || normalizeCurpForLookup(localResult.curp) || "",
+    bodyData.curpTxt || localResult.curp || "",
     status,
     summary.approved || 0,
     documentNamesByStatus(reviewPayload, "rejected"),
@@ -959,7 +1014,7 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
   const parentId = ENV.GOOGLE_DRIVE_PARENT_FOLDER_ID || ENV.DRIVE_PARENT_FOLDER_ID;
   const { drive, sheets, slides } = await getClients();
 
-  const curp = normalizeCurpForLookup(draftResult.curp) || normalizeCurpForLookup(bodyData.curpTxt || "");
+  const curp = normalizeCurpForLookup(draftResult.curp || bodyData.curpTxt || "");
   const folderName = `${safeName(bodyData.nombre)}_${safeName(curp || draftResult.jobId || "BORRADOR")}`;
   const driverFolder = await findOrCreateFolder(drive, {
     name: folderName,
@@ -985,6 +1040,15 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
     });
   }
 
+  if (draftResult.credentialPdf?.absolutePath && fs.existsSync(draftResult.credentialPdf.absolutePath)) {
+    googleFiles.credentialPdf = await uploadFileToDrive(drive, {
+      parentId: driverFolder.id,
+      localPath: draftResult.credentialPdf.absolutePath,
+      name: "Credencial SHIP.pdf",
+      mimeType: "application/pdf",
+    });
+  }
+
   const manifestPath = path.join(path.dirname(Object.values(draftResult.filePaths || {})[0]?.absolutePath || path.join(process.cwd(), "draft.json")), "draft_manifest.json");
   try {
     fs.writeFileSync(manifestPath, JSON.stringify({
@@ -1006,43 +1070,45 @@ async function archiveDraftToGoogle({ draftResult, bodyData, reviewPayload }) {
     console.warn("[googleArchive] No se pudo guardar manifest de borrador:", err?.message || err);
   }
 
-  const draftCredential = getDraftCredentialReadiness({
-    bodyData,
-    reviewPayload,
-    googleFiles,
-    curp,
-  });
+  if (!googleFiles.credentialPdf) {
+    const draftCredential = getDraftCredentialReadiness({
+      bodyData,
+      reviewPayload,
+      googleFiles,
+      curp,
+    });
 
-  if (draftCredential.ready) {
-    try {
-      const generated = await generateCredentialPdfFromRow({
-        row: draftCredential.row,
-        drive,
-        slides,
-      });
-      if (generated?.ok) {
-        googleFiles.credentialPdf = { id: generated.pdfId, webViewLink: generated.pdfLink };
-      } else {
-        console.warn("[googleArchive] Credencial de borrador omitida:", generated?.reason || generated?.errors || generated);
+    if (draftCredential.ready) {
+      try {
+        const generated = await generateCredentialPdfFromRow({
+          row: draftCredential.row,
+          drive,
+          slides,
+        });
+        if (generated?.ok) {
+          googleFiles.credentialPdf = { id: generated.pdfId, webViewLink: generated.pdfLink };
+        } else {
+          console.warn("[googleArchive] Credencial de borrador omitida:", generated?.reason || generated?.errors || generated);
+        }
+      } catch (err) {
+        console.warn("[googleArchive] No se pudo generar credencial del borrador:", err?.message || err);
       }
-    } catch (err) {
-      console.warn("[googleArchive] No se pudo generar credencial del borrador:", err?.message || err);
+    } else {
+      console.info("[googleArchive] Credencial de borrador no generada. Faltan:", draftCredential.missing.join(", "));
     }
-  } else {
-    console.info("[googleArchive] Credencial de borrador no generada. Faltan:", draftCredential.missing.join(", "));
   }
 
   const row = buildSheetRow({
     localResult: {
       jobId: draftResult.jobId,
-      credentialId: "",
+      credentialId: draftResult.credentialId || "",
       curp,
     },
     googleFiles,
     driverFolder,
     bodyData: {
       ...bodyData,
-      curpTxt: normalizeCurpForLookup(bodyData.curpTxt) || curp,
+      curpTxt: bodyData.curpTxt || curp,
     },
     reviewPayload,
     rowStatus: "BORRADOR",
@@ -1134,7 +1200,7 @@ async function archiveRegistrationToGoogle({ localResult, bodyData, reviewPayloa
     reviewPayload,
   });
 
-  const curp = normalizeCurpForLookup(bodyData.curpTxt) || normalizeCurpForLookup(localResult.curp || "");
+  const curp = normalizeCurpForLookup(bodyData.curpTxt || localResult.curp || "");
   const sheetAppend = await upsertFinalSheetRow(sheets, { curp, row });
 
   return {

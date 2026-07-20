@@ -1927,14 +1927,88 @@
       showAppModal(title, message, { type: "error" });
     }
 
+    function normalizeFriendlyText(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    }
+
+    function compactFriendlyText(value) {
+      return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    function errorPayloadFrom(err) {
+      if (err?.payload && typeof err.payload === "object") return err.payload;
+      if (err && typeof err === "object" && (err.userMessage || err.error || err.code || err.cause || err.action)) return err;
+      return null;
+    }
+
+    function joinReasonParts(message, cause, action) {
+      return compactFriendlyText(message || action || cause || "Ocurrió un error.");
+    }
+
     function friendlyErrorMessage(err, fallback) {
-      const text = err?.message || String(err || "") || fallback || "Ocurrió un error.";
-      if (text.includes("DUPLICATE_CURP") || text.includes("ya tiene un registro final") || text.includes("No se puede registrar de nuevo")) {
-        return "Esta CURP ya tiene un registro final. No se puede registrar de nuevo.";
+      const payload = errorPayloadFrom(err);
+      if (payload?.userMessage) return compactFriendlyText(payload.userMessage);
+      if (payload?.error) return compactFriendlyText(payload.error);
+
+      const raw = compactFriendlyText(payload?.error || err?.message || String(err || "") || fallback || "Ocurrió un error.");
+      const text = normalizeFriendlyText(raw);
+
+      if (text.includes("duplicate_curp") || text.includes("ya tiene un registro final") || text.includes("no se puede registrar de nuevo")) {
+        return "Esta CURP ya está registrada.";
       }
-      if (text.includes("Unable to parse range")) return "No pudimos guardar el registro. Intenta de nuevo o avisa al equipo de soporte.";
-      if (text.includes("GEMINI_API_KEY")) return "No pudimos revisar los documentos. Avisa al equipo de soporte.";
-      return text.length > 180 ? `${text.slice(0, 177)}...` : text;
+      if (text.includes("curp invalida") || text.includes("curp inválida")) {
+        return "La CURP no es válida.";
+      }
+      if (text.includes("failed to fetch") || text.includes("network") || text.includes("load failed")) {
+        return "Se perdió la conexión a internet.";
+      }
+      if (text.includes("multipart/form-data") || text.includes("boundary")) {
+        return "No se recibieron los archivos. Vuelve a subirlos.";
+      }
+      if (text.includes("tipo de archivo no permitido")) {
+        return "Formato no permitido. Usa PDF, JPG, PNG o WEBP.";
+      }
+      if (text.includes("no parece ser pdf/imagen valida") || text.includes("no parece ser pdf/imagen válida") || text.includes("no coincide con su tipo declarado")) {
+        return "El archivo no se puede leer. Vuelve a subirlo.";
+      }
+      if (text.includes("file too large") || text.includes("peso permitido") || (text.includes("supera") && text.includes("mb"))) {
+        return "El archivo pesa demasiado. Máximo 5 MB.";
+      }
+      if (text.includes("gemini_api_key") || text.includes("falta variable") || text.includes("no configurada") || text.includes("no configurado")) {
+        return "La validación no está disponible. Avisa al equipo técnico.";
+      }
+      if (text.includes("max_tokens") || text.includes("finishreason") || text.includes("json valido") || text.includes("json válido") || text.includes("respuesta valida") || text.includes("respuesta válida")) {
+        return "La IA no pudo leer el documento completo. Sube uno más claro.";
+      }
+      if (text.includes("rate limit") || text.includes("429") || text.includes("quota")) {
+        return "La validación está saturada. Intenta en unos minutos.";
+      }
+      if (text.includes("unavailable") || text.includes("overloaded") || text.includes("503") || text.includes("modelos intentados")) {
+        return "La IA no respondió. Intenta en unos minutos.";
+      }
+      if (text.includes("timeout") || text.includes("etimedout") || text.includes("econnaborted") || text.includes("socket hang up")) {
+        return "La operación tardó demasiado. Intenta de nuevo.";
+      }
+      if (text.includes("permission") || text.includes("permis") || text.includes("403") || text.includes("not authorized")) {
+        return "Faltan permisos del sistema. Avisa al equipo técnico.";
+      }
+      if (text.includes("unable to parse range") || text.includes("no se encontro el header") || text.includes("no se encontró el header") || text.includes("no existe columna") || text.includes("spreadsheet_id")) {
+        return "No se pudo escribir en Sheets. Avisa al equipo técnico.";
+      }
+      if (text.includes("drive_parent_folder_id") || text.includes("folder")) {
+        return "No se pudo guardar en Drive. Avisa al equipo técnico.";
+      }
+      if (/http\s*5\d\d/.test(text) || text.includes("internal server error")) {
+        return "El servidor tuvo un problema. Intenta de nuevo.";
+      }
+      if (/http\s*4\d\d/.test(text)) {
+        return "Falta información. Revisa el formulario.";
+      }
+
+      return raw.length > 160 ? `${raw.slice(0, 157)}...` : raw;
     }
 
     function formatMbFromBytes(bytes) {
@@ -2481,7 +2555,7 @@
       const curp = getCurpFromLatestReview();
 
       if (!curp || curp.length < 18) {
-        errEl.textContent = "No fue posible guardar el avance porque la CURP no existe o el documento CURP no quedó validado por IA. Sube un documento CURP correcto, vuelve a validar y después guarda el avance.";
+        errEl.textContent = "No se detectó una CURP válida. Sube el documento CURP.";
         errEl.style.display = "block";
         return;
       }
@@ -2507,10 +2581,14 @@
 
         if (data.credentialGenerated) {
           toast.textContent = `Avance guardado y credencial generada. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
-          showSuccess("Avance guardado y credencial generada", "Se generó la credencial porque ya existen CURP, RFC, foto y NSS.");
+          showSuccess("Avance guardado y credencial generada", "Se generó la credencial porque ya existen NSS, RFC, CURP, foto personal válida y nombre validado con INE/CURP.");
         } else {
           toast.textContent = `Avance guardado correctamente. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
-          showSuccess("Avance guardado", "Podrás continuar después ingresando tu CURP. La credencial se generará cuando existan CURP, RFC, foto y NSS.");
+          const pendingReasons = Array.isArray(data.credentialPendingReasons) ? data.credentialPendingReasons : [];
+          const detail = pendingReasons.length
+            ? `Credencial pendiente: ${pendingReasons.join(" ")}`
+            : "La credencial se generará con NSS, RFC, CURP, foto válida y nombre validado con INE/CURP.";
+          showSuccess("Avance guardado", detail);
         }
         setTimeout(() => toast.classList.remove("active"), 8000);
       } catch (err) {

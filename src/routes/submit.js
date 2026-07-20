@@ -5,6 +5,7 @@ const { upload, validateUploadedFiles } = require("../middleware/upload");
 const { setJob, getJob } = require("../services/jobStore");
 const { uploadStepFiles, finalizeSubmission } = require("../services/processSubmission");
 const { toUpperClean, digitsOnly } = require("../utils/strings");
+const { friendlyPayload } = require("../utils/friendlyErrors");
 
 const router = express.Router();
 
@@ -31,12 +32,12 @@ function hasBoundary(req) {
 function processUploadMiddleware(req, res, next) {
   const ct = req.headers["content-type"];
   if (typeof ct === "string" && ct.includes("multipart/form-data") && !hasBoundary(req)) {
-    return res.status(400).json({ ok: false, error: "multipart/form-data inválido" });
+    return res.status(400).json(friendlyPayload(new Error("multipart/form-data inválido"), "No se recibieron los archivos."));
   }
   uploadFields(req, res, (err) => {
     if (err) {
       console.error("[/submit] Multer error:", err);
-      return res.status(400).json({ ok: false, error: `Error subiendo archivos: ${err.message}` });
+      return res.status(400).json(friendlyPayload(err, "No pudimos subir los archivos."));
     }
     validateUploadedFiles(req, res, next);
   });
@@ -136,7 +137,7 @@ router.post("/submit-step", processUploadMiddleware, async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error /submit-step:", err);
-    return res.status(500).json({ ok: false, error: "Error en el paso." });
+    return res.status(500).json(friendlyPayload(err, "No fue posible guardar este paso."));
   }
 });
 
@@ -145,7 +146,7 @@ router.post("/submit-step", processUploadMiddleware, async (req, res) => {
 router.post("/submit-final", processUploadMiddleware, async (req, res) => {
   try {
     const jobId = String(req.body.jobId || "");
-    if (!jobId) return res.status(400).json({ ok: false, error: "Missing jobId" });
+    if (!jobId) return res.status(400).json(friendlyPayload(new Error("Falta jobId."), "No se pudo continuar con el formulario."));
 
     // In case there's any final fallback data in this last request
     const b = req.body || {};
@@ -165,7 +166,7 @@ router.post("/submit-final", processUploadMiddleware, async (req, res) => {
 
     const job = getJob(jobId);
     if (!job || !job.data) {
-       return res.status(400).json({ ok: false, error: "Sesion caducada o sin datos previos." });
+       return res.status(400).json(friendlyPayload(new Error("Sesión caducada o sin datos previos."), "No se pudo finalizar el registro."));
     }
     
     // Process background process (writing to Sheets) once previous uploads are done
@@ -190,7 +191,7 @@ router.post("/submit-final", processUploadMiddleware, async (req, res) => {
 
   } catch (err) {
     console.error("❌ Error /submit-final:", err);
-    return res.status(500).json({ ok: false, error: "Ocurrió un error guardando." });
+    return res.status(500).json(friendlyPayload(err, "No fue posible guardar el registro."));
   }
 });
 

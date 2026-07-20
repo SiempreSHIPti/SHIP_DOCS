@@ -216,32 +216,11 @@ function isNameValidatedWithIne(reviewPayload = {}) {
   });
 }
 
-const CURP_REGEX = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
-
 function normalizeCurp(value) {
   return String(value || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 18);
-}
-
-function isValidCurp(value) {
-  return CURP_REGEX.test(normalizeCurp(value));
-}
-
-function reviewRowStatus(row = {}) {
-  return String(row?.status || row?.state || "").toLowerCase().trim();
-}
-
-function isCurpRowValidated(row = {}) {
-  if (!row) return false;
-  const status = reviewRowStatus(row);
-  const severity = String(row?.severity || "").toLowerCase().trim();
-
-  if (row?.ok === false || severity === "error") return false;
-  if (["rejected", "missing", "invalid", "manual_review", "warning", "pending"].includes(status)) return false;
-  if (row?.ok === true) return true;
-  return ["approved", "ok", "valid", "validated", "success"].includes(status);
 }
 
 function findCurpInText(value) {
@@ -252,9 +231,7 @@ function findCurpInText(value) {
 
 function getCurpFromReview(reviewPayload) {
   const rows = reviewPayload?.results || [];
-  const curpRow = rows.find((row) => row?.fieldName === "curp");
-
-  if (!isCurpRowValidated(curpRow)) return "";
+  const curpRow = rows.find((row) => row.fieldName === "curp");
 
   const candidates = [
     curpRow?.fields?.curp,
@@ -266,10 +243,10 @@ function getCurpFromReview(reviewPayload) {
 
   for (const candidate of candidates) {
     const direct = normalizeCurp(candidate);
-    if (isValidCurp(direct)) return direct;
+    if (direct.length === 18) return direct;
 
     const fromText = findCurpInText(candidate);
-    if (isValidCurp(fromText)) return fromText;
+    if (fromText.length === 18) return fromText;
   }
 
   return "";
@@ -415,6 +392,24 @@ async function saveLocalDraft({ jobId, body, files, reviewPayload }) {
   };
 }
 
+async function updateLocalDraftCredential(curpRaw, credential = {}) {
+  const curp = normalizeCurp(curpRaw);
+  if (!curp || curp.length < 18) return null;
+
+  const draftPath = path.join(draftsRoot(), curp, "draft.json");
+  if (!fssync.existsSync(draftPath)) return null;
+
+  const draft = JSON.parse(await fs.readFile(draftPath, "utf8"));
+  draft.credentialId = credential.credentialId || "";
+  draft.credentialPdf = credential.credentialPdf || null;
+  draft.credentialGenerated = credential.generated === true;
+  draft.credentialEligibility = credential.eligibility || null;
+  draft.credentialUpdatedAt = new Date().toISOString();
+
+  await fs.writeFile(draftPath, JSON.stringify(draft, null, 2), "utf8");
+  return draft;
+}
+
 async function loadLocalDraft(curpRaw) {
   const curp = normalizeCurp(curpRaw);
   if (!curp || curp.length < 18) return null;
@@ -483,6 +478,7 @@ module.exports = {
   normalizeCurp,
   getCurpFromReview,
   saveLocalDraft,
+  updateLocalDraftCredential,
   loadLocalDraft,
   getDraftFile,
   mergeDraftFilesWithUploads,

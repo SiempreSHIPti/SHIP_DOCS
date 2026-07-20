@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js && node --check src/server.js && node --check src/routes/submit.js && node --check src/routes/jobStatus.js && node --check src/routes/documentValidationRealtime.js && node --check src/routes/finalDocumentReview.js && node --check src/routes/saveLocalRegistration.js && node --check src/routes/draftLocalRegistration.js && node --check src/services/localExcelArchive.js && node --check src/services/localDraftStore.js && node --check src/services/googleArchive.js && node --check src/services/processSubmission.js && node --check src/services/documentValidation.js && node --check src/middleware/upload.js && node --check src/middleware/security.js",
+    "check": "node --check index.js && node --check src/server.js && node --check src/routes/submit.js && node --check src/routes/jobStatus.js && node --check src/routes/documentValidationRealtime.js && node --check src/routes/finalDocumentReview.js && node --check src/routes/saveLocalRegistration.js && node --check src/routes/draftLocalRegistration.js && node --check src/services/localExcelArchive.js && node --check src/services/credentialEligibility.js && node --check src/services/localDraftStore.js && node --check src/services/googleArchive.js && node --check src/services/processSubmission.js && node --check src/services/documentValidation.js && node --check src/utils/friendlyErrors.js && node --check src/middleware/upload.js && node --check src/middleware/security.js && node -e \"require('./src/server').buildApp(); console.log('Startup smoke check OK')\"",
     "dev:local": "node index.js",
     "dev:ai-review-only": "node index.js"
   },

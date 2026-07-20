@@ -6,6 +6,7 @@ const { saveRegistrationToLocalExcel, FILE_FIELDS } = require("../services/local
 const { mergeDraftFilesWithUploads, getCurpFromReview, findCompletedRegistration, markCurpCompleted, deleteLocalDraft } = require("../services/localDraftStore");
 const { archiveRegistrationToGoogle, assertNoDuplicateFinalRegistration } = require("../services/googleArchive");
 const { ENV } = require("../config/env");
+const { friendlyPayload } = require("../utils/friendlyErrors");
 
 const router = express.Router();
 
@@ -21,6 +22,15 @@ function hasBoundary(req) {
   return typeof ct === "string" && ct.includes("multipart/form-data") && ct.includes("boundary=");
 }
 
+
+
+function duplicateCurpPayload(curp, duplicate) {
+  return friendlyPayload(
+    Object.assign(new Error(`La CURP ${curp} ya tiene un registro final. No se puede registrar de nuevo.`), { code: "DUPLICATE_CURP" }),
+    "Esta CURP ya tiene un registro final.",
+    { duplicateRegistered: true, duplicate }
+  );
+}
 
 function parseClientReviewPayload(value) {
   if (!value) return null;
@@ -41,13 +51,13 @@ function parseClientReviewPayload(value) {
 function processUploadMiddleware(req, res, next) {
   const ct = req.headers["content-type"];
   if (typeof ct === "string" && ct.includes("multipart/form-data") && !hasBoundary(req)) {
-    return res.status(400).json({ ok: false, error: "multipart/form-data inválido" });
+    return res.status(400).json(friendlyPayload(new Error("multipart/form-data inválido"), "No se recibieron los archivos."));
   }
 
   uploadFields(req, res, (err) => {
     if (err) {
       console.error("[/api/registration/save-local] Multer error:", err);
-      return res.status(400).json({ ok: false, error: `Error leyendo archivos: ${err.message}` });
+      return res.status(400).json(friendlyPayload(err, "No pudimos leer los archivos enviados."));
     }
     validateUploadedFiles(req, res, next);
   });
@@ -55,25 +65,24 @@ function processUploadMiddleware(req, res, next) {
 
 router.post("/api/registration/save-local", processUploadMiddleware, async (req, res) => {
   const jobId = String(req.body.jobId || "").trim();
-  if (!jobId) return res.status(400).json({ ok: false, error: "Falta jobId." });
+  if (!jobId) return res.status(400).json(friendlyPayload(new Error("Falta jobId."), "No se pudo continuar con el formulario."));
 
   const job = getJob(jobId) || {};
   const finalReview = job.data?.finalReview || parseClientReviewPayload(req.body.clientReviewPayload) || null;
 
   if (!finalReview?.summary) {
-    return res.status(400).json({
-      ok: false,
-      error: "Primero ejecuta la revisión IA final antes de guardar el registro.",
-    });
+    return res.status(400).json(friendlyPayload(
+      new Error("Primero ejecuta la revisión IA final antes de guardar el registro."),
+      "No se puede guardar el registro todavía."
+    ));
   }
 
   if (!finalReview.summary.canContinue) {
-    return res.status(422).json({
-      ok: false,
-      error: "No se puede guardar como completo porque existen documentos faltantes, rechazados o pendientes de validar.",
-      summary: finalReview.summary,
-      validationErrors: job.validationErrors || [],
-    });
+    return res.status(422).json(friendlyPayload(
+      new Error("No se puede guardar como completo porque existen documentos faltantes, rechazados o pendientes de validar."),
+      "No se puede guardar el registro como completo.",
+      { summary: finalReview.summary, validationErrors: job.validationErrors || [] }
+    ));
   }
 
   try {
@@ -82,13 +91,7 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
       if (!useGoogleArchiveAsRegistry()) {
         const localDuplicate = await findCompletedRegistration(curpDetected);
         if (localDuplicate) {
-          return res.status(409).json({
-            ok: false,
-            duplicateRegistered: true,
-            code: "DUPLICATE_CURP",
-            error: `La CURP ${curpDetected} ya tiene un registro final. No se puede registrar de nuevo.`,
-            duplicate: localDuplicate,
-          });
+          return res.status(409).json(duplicateCurpPayload(curpDetected, localDuplicate));
         }
       }
 
@@ -150,22 +153,20 @@ router.post("/api/registration/save-local", processUploadMiddleware, async (req,
     });
   } catch (err) {
     console.error("❌ Error guardando registro local:", err);
-    const message = err?.message || "Error guardando registro en Excel local.";
+    const payload = friendlyPayload(err, "No fue posible guardar el registro.", {
+      duplicateRegistered: err?.code === "DUPLICATE_CURP",
+      code: err?.code || "SAVE_LOCAL_ERROR",
+      duplicate: err?.duplicate || null,
+    });
 
     setJob(jobId, {
       ok: false,
       state: "save_local_error",
-      message,
+      message: payload.userMessage || payload.error,
     });
 
     const status = err?.code === "DUPLICATE_CURP" ? 409 : 500;
-    return res.status(status).json({
-      ok: false,
-      duplicateRegistered: err?.code === "DUPLICATE_CURP",
-      code: err?.code || "SAVE_LOCAL_ERROR",
-      duplicate: err?.duplicate || null,
-      error: message,
-    });
+    return res.status(status).json(payload);
   }
 });
 

@@ -85,8 +85,14 @@ const DOC_RULES = {
     label: "Foto personal / selfie",
     expectedType: "selfie_foto_personal",
     requireNameMatch: false,
-    minConfidence: 0.65,
-    requiredEvidence: ["rostro_visible", "foto_clara"],
+    minConfidence: 0.80,
+    requiredEvidence: [
+      "una_persona_real",
+      "rostro_visible",
+      "captura_directa_de_camara",
+      "sin_pantalla_telefono_monitor",
+      "sin_foto_impresa_o_foto_de_otra_foto",
+    ],
   },
 };
 
@@ -270,7 +276,15 @@ Analiza visualmente/OCR el documento y responde SOLO JSON válido con esta estru
     "fecha": string|null,
     "ownerName": string|null,
     "propietario": string|null,
-    "asegurado": string|null
+    "asegurado": string|null,
+    "isRealPerson": boolean|null,
+    "isDirectCameraCapture": boolean|null,
+    "isScreenRecapture": boolean|null,
+    "isPrintedPhoto": boolean|null,
+    "isPhotoOfPhoto": boolean|null,
+    "screenOrDeviceDetected": boolean|null,
+    "faceCount": number|null,
+    "spoofIndicators": string[]
   },
   "issues": string[],
   "recommendation": "accept"|"reject"|"manual_review",
@@ -288,6 +302,15 @@ Reglas:
 - Si el documento esperado es Tarjeta de circulación o Póliza de seguro, valida que el documento sea real/válido aunque no esté a nombre del driver.
 - Para Tarjeta de circulación o Póliza de seguro, si detectas propietario/asegurado/titular, colócalo en nameFound y también en fields.ownerName, fields.propietario o fields.asegurado.
 - Para Tarjeta de circulación o Póliza de seguro, si el documento es válido pero no está a nombre del driver, no lo rechaces por nombre; usa recommendation manual_review, ok true y explica la observación.
+- REGLAS ESPECIALES PARA FOTO PERSONAL / SELFIE:
+  - Debe aparecer exactamente una persona real, con el rostro visible, suficientemente grande y enfocado.
+  - Debe parecer una captura directa de cámara de la persona presente frente al dispositivo.
+  - Rechaza fotografías tomadas a otra fotografía, a una credencial, a una impresión, a un teléfono, tableta, laptop, monitor o televisión.
+  - Rechaza capturas de pantalla, imágenes con marco de dispositivo, bordes de pantalla, reflejos de cristal, patrón moiré, pixelado de pantalla, brillo de monitor o una mano sosteniendo otra foto/dispositivo.
+  - Rechaza imágenes generadas artificialmente o rostros evidentemente sintéticos cuando existan señales visuales claras.
+  - En fields informa obligatoriamente isRealPerson, isDirectCameraCapture, isScreenRecapture, isPrintedPhoto, isPhotoOfPhoto, screenOrDeviceDetected, faceCount y spoofIndicators.
+  - Para aprobar la selfie: isRealPerson=true, isDirectCameraCapture=true, faceCount=1 y todos los indicadores de recaptura/impresión/dispositivo=false.
+  - Si no puedes confirmar una captura directa con confianza suficiente, recommendation debe ser reject y explica el indicador observado.
 - No inventes datos no visibles.
 - No devuelvas texto fuera del JSON.
 `;
@@ -411,7 +434,15 @@ function localMockValidation({ fieldName, file, rule, expectedName, jobId }) {
     fecha: ok ? new Date().toISOString().slice(0, 10) : null,
     ownerName: ownerObservation ? (ownerMatchesInFileName ? expectedName : "TERCERO DEMO") : null,
     propietario: fieldName === "tarjeta" ? (ownerMatchesInFileName ? expectedName : "TERCERO DEMO") : null,
-    asegurado: fieldName === "poliza" ? (ownerMatchesInFileName ? expectedName : "TERCERO DEMO") : null
+    asegurado: fieldName === "poliza" ? (ownerMatchesInFileName ? expectedName : "TERCERO DEMO") : null,
+    isRealPerson: fieldName === "selfie" ? ok : null,
+    isDirectCameraCapture: fieldName === "selfie" ? ok : null,
+    isScreenRecapture: fieldName === "selfie" ? false : null,
+    isPrintedPhoto: fieldName === "selfie" ? false : null,
+    isPhotoOfPhoto: fieldName === "selfie" ? false : null,
+    screenOrDeviceDetected: fieldName === "selfie" ? false : null,
+    faceCount: fieldName === "selfie" && ok ? 1 : null,
+    spoofIndicators: []
   };
 
   const raw = {
@@ -554,6 +585,32 @@ async function callGemini({ file, rule, expectedName, jobId }) {
   throw new Error(`No se pudo validar con Gemini. Modelos intentados: ${models.join(", ")}. Último error: ${msg}`);
 }
 
+function nullableBoolean(value) {
+  if (value === true || value === false) return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "si", "sí"].includes(normalized)) return true;
+    if (["false", "0", "no"].includes(normalized)) return false;
+  }
+  return null;
+}
+
+function buildSelfieVerification(fields = {}) {
+  const faceCountRaw = Number(fields.faceCount ?? fields.face_count);
+  return {
+    isRealPerson: nullableBoolean(fields.isRealPerson ?? fields.real_person ?? fields.persona_real),
+    isDirectCameraCapture: nullableBoolean(fields.isDirectCameraCapture ?? fields.direct_camera_capture ?? fields.captura_directa),
+    isScreenRecapture: nullableBoolean(fields.isScreenRecapture ?? fields.screen_recapture ?? fields.foto_a_pantalla),
+    isPrintedPhoto: nullableBoolean(fields.isPrintedPhoto ?? fields.printed_photo ?? fields.foto_impresa),
+    isPhotoOfPhoto: nullableBoolean(fields.isPhotoOfPhoto ?? fields.photo_of_photo ?? fields.foto_de_foto),
+    screenOrDeviceDetected: nullableBoolean(fields.screenOrDeviceDetected ?? fields.device_detected ?? fields.pantalla_o_dispositivo_detectado),
+    faceCount: Number.isFinite(faceCountRaw) ? faceCountRaw : null,
+    spoofIndicators: Array.isArray(fields.spoofIndicators)
+      ? fields.spoofIndicators.map(String).filter(Boolean).slice(0, 10)
+      : [],
+  };
+}
+
 function hardenResult(raw, { fieldName, rule, expectedName }) {
   const fields = raw.fields && typeof raw.fields === "object" ? raw.fields : {};
   const ownerCandidate = firstNonEmpty(
@@ -629,6 +686,32 @@ function hardenResult(raw, { fieldName, rule, expectedName }) {
     if (!result.fields?.banco) blockingIssues.push("No se detectó banco emisor.");
   }
 
+  const selfieVerification = fieldName === "selfie" ? buildSelfieVerification(result.fields) : null;
+  if (selfieVerification) {
+    if (selfieVerification.isRealPerson !== true) {
+      blockingIssues.push("No se pudo confirmar que la imagen corresponda a una persona real.");
+    }
+    if (selfieVerification.isDirectCameraCapture !== true) {
+      blockingIssues.push("La foto no parece una captura directa de cámara de la persona.");
+    }
+    if (selfieVerification.isScreenRecapture === true || selfieVerification.screenOrDeviceDetected === true) {
+      blockingIssues.push("Se detectó que la imagen podría ser una fotografía tomada a un teléfono, monitor u otra pantalla.");
+    }
+    if (selfieVerification.isPrintedPhoto === true || selfieVerification.isPhotoOfPhoto === true) {
+      blockingIssues.push("Se detectó una fotografía impresa o una foto tomada a otra fotografía.");
+    }
+    if (selfieVerification.faceCount !== 1) {
+      blockingIssues.push(
+        selfieVerification.faceCount === null
+          ? "No se pudo confirmar que aparezca exactamente un rostro."
+          : `La fotografía debe contener exactamente una persona; se detectaron ${selfieVerification.faceCount} rostros.`
+      );
+    }
+    for (const indicator of selfieVerification.spoofIndicators) {
+      blockingIssues.push(`Indicador de recaptura: ${indicator}`);
+    }
+  }
+
   const documentItselfValid =
     result.isExpectedDocument &&
     result.isLegible &&
@@ -679,6 +762,7 @@ function hardenResult(raw, { fieldName, rule, expectedName }) {
     ownerMatchesDriver: ownerStatus === "matches_driver",
     nameSimilarity: nameCheck.similarity,
     accentInsensitiveNameMatch: nameCheck.accentInsensitiveExact,
+    ...(selfieVerification ? { selfieVerification } : {}),
     issues: [...new Set(blockingIssues)],
     warnings: [...new Set(warningIssues)],
     recommendation
