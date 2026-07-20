@@ -2580,8 +2580,8 @@
         loadedDraftCurp = data.curp || curp;
 
         if (data.credentialGenerated) {
-          toast.textContent = `Avance guardado y credencial generada. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
-          showSuccess("Avance guardado y credencial generada", "Se generó la credencial porque ya existen NSS, RFC, CURP, foto personal válida y nombre validado con INE/CURP.");
+          toast.textContent = `Avance guardado. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
+          showSuccess("Avance guardado", "Se generó la credencial porque ya existen NSS, RFC, CURP, foto personal válida y nombre validado con INE/CURP.");
         } else {
           toast.textContent = `Avance guardado correctamente. Para continuar después, ingresa tu CURP: ${loadedDraftCurp}.`;
           const pendingReasons = Array.isArray(data.credentialPendingReasons) ? data.credentialPendingReasons : [];

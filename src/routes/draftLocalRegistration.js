@@ -149,9 +149,9 @@ router.post("/api/registration/save-draft-local", processUploadMiddleware, async
     const credentialGenerated = result.credentialGenerated === true || Boolean(googleDraft?.googleFiles?.credentialPdf?.webViewLink);
     const pendingReasons = result.credentialEligibility?.reasons || [];
     const message = credentialGenerated
-      ? `Avance guardado correctamente y credencial generada. Para continuar después, usa la CURP ${result.curp}.`
+      ? `Avance guardado correctamente . Para continuar después, usa la CURP ${result.curp}.`
       : pendingReasons.length
-        ? `Avance guardado correctamente. Credencial pendiente: ${pendingReasons.join(" ")}`
+        ? `Avance guardado correctamente.`
         : `Avance guardado correctamente. Para continuar después, usa la CURP ${result.curp}.`;
 
     setJob(jobId, {
