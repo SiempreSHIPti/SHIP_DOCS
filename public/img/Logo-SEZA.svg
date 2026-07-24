@@ -1,0 +1,10 @@
+<svg width="420" height="180" viewBox="0 0 420 180" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Grupo SEZA">
+  <title>Grupo SEZA</title>
+  <g fill="#1A73E8">
+    <text x="22" y="55" font-family="Arial Black, Montserrat, Arial, sans-serif" font-size="34" font-weight="900" letter-spacing="1.5">GRUPO</text>
+    <text x="22" y="137" font-family="Arial Black, Montserrat, Arial, sans-serif" font-size="92" font-weight="900" letter-spacing="-7">SEZ</text>
+    <path d="M285 137L331 65L378 137H343L331 116H310L297 137H285Z"/>
+    <path d="M321 99H339L330 82L321 99Z" fill="#FFFFFF"/>
+    <circle cx="173" cy="30" r="5" fill="#1A73E8"/>
+  </g>
+</svg>

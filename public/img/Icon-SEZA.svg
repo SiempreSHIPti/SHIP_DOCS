@@ -1,0 +1,7 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Grupo SEZA">
+  <rect width="128" height="128" rx="26" fill="#1A73E8"/>
+  <text x="16" y="43" font-family="Arial Black, Arial, sans-serif" font-size="19" font-weight="900" fill="#FFFFFF" letter-spacing=".6">GRUPO</text>
+  <text x="13" y="88" font-family="Arial Black, Arial, sans-serif" font-size="42" font-weight="900" fill="#FFFFFF" letter-spacing="-3">SEZ</text>
+  <path d="M85 88L103 56L121 88H108L103 79H95L90 88H85Z" fill="#FFFFFF"/>
+  <path d="M99 72H106L103 65L99 72Z" fill="#1A73E8"/>
+</svg>

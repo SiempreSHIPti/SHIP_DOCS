@@ -1,0 +1,1722 @@
+/* =========================================================
+   Grupo SEZA — identidad azul y blanco
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700;900&family=Squada+One&display=swap');
+
+:root {
+  --primary: #002673 !important;
+  --secondary: #2E7AF5 !important;
+  --accent: #6f9bcf !important;
+  --dark: #f4f7fb !important;
+  --band-bg: transparent !important;
+  --glass-border: rgba(36, 66, 143, .14) !important;
+  --card-bg: #ffffff !important;
+  --text-main: #10243f !important;
+  --text-muted: #61728c !important;
+  --input-bg: #f8fbff !important;
+  --input-border: #d7e4f4 !important;
+
+  --seza-navy: #002673;
+  --seza-blue: #2E7AF5;
+  --seza-light: #6f9bcf;
+  --seza-page: #f5f8fc;
+  --seza-card: #ffffff;
+  --seza-line: #d9e5f3;
+  --seza-text: #10243f;
+  --seza-muted: #61728c;
+  --seza-success: #0f9f6e;
+  --seza-warning: #b7791f;
+  --seza-danger: #d93025;
+
+  --seza-font-body: 'Roboto Condensed', Arial, sans-serif;
+  --seza-radius-sm: 10px;
+  --seza-radius-md: 16px;
+  --seza-radius-lg: 24px;
+  --seza-radius-xl: 28px;
+  --seza-shadow-sm: 0 4px 14px rgba(36, 66, 143, .08);
+  --seza-shadow-md: 0 16px 48px rgba(36, 66, 143, .12);
+  --seza-shadow-lg: 0 28px 80px rgba(36, 66, 143, .14);
+}
+
+* {
+  scrollbar-color: #a8c2df transparent;
+}
+
+html, body.pre-registration {
+  background: #002673 !important; 
+  min-height: 100vh !important; /* Cambiado de height a min-height */
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important; /* Permite el scroll vertical */
+}
+
+/* Localizamos el contenedor problemático y le quitamos todo su estilo visual */
+body.pre-registration .main-wrapper,
+body.pre-registration .resume-actions-card,
+body.pre-registration #root,
+body.pre-registration #app {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 20px 0 !important; /* Añadimos un poco de padding superior e inferior */
+  margin: 0 !important;
+  width: 100vw !important;
+  min-height: 100vh !important; /* Cambiado de height a min-height */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+/* Header fijo */
+.seza-app-header {
+  position: fixed;
+  z-index: 200;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  background: rgba(255, 255, 255, .92);
+  border-bottom: 1px solid var(--seza-line);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 24px rgba(36, 66, 143, .08);
+}
+
+.seza-app-header-inner {
+  width: min(1180px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.seza-app-header-logo {
+  height: 40px;
+  width: auto;
+  max-width: 180px;
+  object-fit: contain;
+  display: block;
+}
+
+.seza-app-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.seza-app-header-badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--seza-navy);
+  background: #eef5ff;
+  border: 1px solid var(--seza-line);
+}
+
+.seza-app-header-badge--accent {
+  color: var(--seza-blue);
+  background: #e8f1fc;
+  border-color: #c7d8ed;
+}
+
+.seza-topbar { display: none !important; }
+
+/* Contenedor principal */
+.main-wrapper {
+  position: relative;
+  z-index: 1;
+  width: min(1140px, 100%) !important;
+  max-width: 1140px !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 0 !important;
+  align-items: stretch !important;
+  background: var(--seza-card) !important;
+  border: 1px solid rgba(36, 66, 143, .14) !important;
+  border-radius: var(--seza-radius-xl) !important;
+  box-shadow: var(--seza-shadow-lg) !important;
+  overflow: hidden !important;
+}
+
+.left-panel {
+  flex: initial !important;
+  position: relative;
+  min-height: auto !important;
+  color: #ffffff !important;
+  background: linear-gradient(155deg, #002673 0%, #2E7AF5 62%, rgba(111, 155, 207, .92) 100%) !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-radius: 0 !important;
+  padding: 28px 36px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.left-panel::after {
+  content: "";
+  position: absolute;
+  right: -80px;
+  top: -80px;
+  width: 220px;
+  height: 220px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .10);
+  pointer-events: none;
+}
+
+.left-content {
+  position: relative;
+  z-index: 1;
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px 28px;
+  width: 100%;
+}
+
+.logo-container {
+  margin-bottom: 0 !important;
+  flex-shrink: 0;
+}
+
+.logo {
+  width: 180px !important;
+  max-height: 64px !important;
+  height: auto !important;
+  display: block !important;
+  object-fit: contain !important;
+  background: #ffffff !important;
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  box-shadow: 0 12px 28px rgba(187, 206, 252, 0.16) !important;
+  .seza-app-header-logo-link{
+    position: relative;
+    z-index: 9999;
+    display: inline-flex;
+}
+
+.seza-app-header-logo{
+    pointer-events: auto;
+}
+}
+
+.left-content h1 {
+  color: #ffffff !important;
+  font-family: var(--seza-font-body) !important;
+  font-size: clamp(22px, 2.5vw, 28px) !important;
+  line-height: 1.1 !important;
+  font-style: normal !important;
+  font-weight: 900 !important;
+  letter-spacing: -.3px !important;
+  margin: 0 !important;
+  flex: 1;
+  min-width: 180px;
+}
+
+.left-content .subtitle { display: none !important; }
+.security-badge { display: none !important; }
+
+.info-list {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px 12px !important;
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100%;
+}
+
+.info-list li {
+  color: rgba(255, 255, 255, .88) !important;
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+  padding: 6px 12px !important;
+  margin: 0 !important;
+  background: rgba(255, 255, 255, .12) !important;
+  border: 1px solid rgba(255, 255, 255, .22) !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+}
+
+.info-list li::before { display: none !important; }
+
+.right-panel {
+  flex: initial !important;
+  min-width: 0;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  align-items: stretch !important;
+  padding: 0 !important;
+  background: #f8fbff !important;
+}
+
+.progress-container {
+  flex: initial !important;
+  width: 100% !important;
+  padding: 24px 36px 20px !important;
+  background: #f1f6fd !important;
+  border-right: none !important;
+  border-bottom: 1px solid #dce8f7 !important;
+}
+
+.progress-bar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 0 !important;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.progress-step {
+  flex: 1;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: #8ca1bd !important;
+  position: relative;
+}
+
+.progress-step span {
+  color: inherit !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+  line-height: 1.2 !important;
+  max-width: 90px;
+}
+
+.progress-dot {
+  width: 40px !important;
+  height: 40px !important;
+  background: #ffffff !important;
+  border: 2px solid #d4e1f2 !important;
+  color: #6f82a0 !important;
+  box-shadow: 0 4px 10px rgba(36, 66, 143, .08) !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+  border-radius: 12px !important;
+}
+
+.progress-step.active { color: var(--seza-navy) !important; }
+
+.progress-step.active .progress-dot {
+  background: var(--seza-navy) !important;
+  border-color: var(--seza-navy) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(36, 66, 143, .24) !important;
+}
+
+.progress-step.completed { color: var(--seza-success) !important; }
+
+.progress-step.completed .progress-dot {
+  background: #e9f8f2 !important;
+  border-color: #10b981 !important;
+  color: #0f9f6e !important;
+}
+
+.progress-line { display: none !important; }
+
+.progress-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: calc(50% + 24px);
+  width: calc(100% - 48px);
+  height: 2px;
+  background: #cbdcf0;
+  z-index: 0;
+  box-shadow: #002673;
+}
+
+.progress-step.completed:not(:last-child)::after {
+  background: var(--seza-success);
+}
+
+.form-container {
+  flex: 1 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 520px;
+  max-height: none !important;
+  margin: 0 !important;
+  overflow-y: auto !important;
+  background: #ffffff !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 36px 48px 48px !important;
+  color: var(--seza-text) !important;
+}
+
+.form-header {
+  border-bottom: 1px solid #dce8f7 !important;
+  padding-bottom: 18px !important;
+  margin-bottom: 28px !important;
+}
+
+.form-header h2 {
+  color: var(--seza-navy) !important;
+  font-family: var(--seza-font-body) !important;
+  font-style: normal !important;
+  font-size: clamp(28px, 3vw, 38px) !important;
+  font-weight: 900 !important;
+  letter-spacing: -.5px !important;
+}
+
+.form-header p,
+.muted,
+.maps-help {
+  color: var(--seza-muted) !important;
+}
+
+.section .hint,
+.vehicle-rule-note {
+  background: #eef5ff !important;
+  color: #24428f !important;
+  border-left: 4px solid var(--seza-blue) !important;
+  border-radius: 12px !important;
+}
+
+label {
+  color: #163b78 !important;
+  font-weight: 900 !important;
+  margin-left: 0 !important;
+}
+
+label svg,
+label .required {
+  color: var(--seza-blue) !important;
+}
+
+input[type="text"],
+input[type="file"],
+select,
+textarea,
+.nss-mode {
+  background: #f8fbff !important;
+  border: 1px solid #cfe0f3 !important;
+  color: #10243f !important;
+  border-radius: var(--seza-radius-sm) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85) !important;
+}
+
+button,
+.btn-primary-review,
+#review-finish-btn,
+#save-draft-btn,
+#review-revalidate-btn,
+.nav-buttons button {
+  border-radius: var(--seza-radius-sm) !important;
+}
+
+input[type="text"]::placeholder,
+textarea::placeholder {
+  color: #9aaac0 !important;
+}
+
+input[type="text"]:hover,
+input[type="file"]:hover,
+select:hover,
+textarea:hover {
+  background: #ffffff !important;
+  border-color: #a8c2df !important;
+}
+
+input[type="text"]:focus,
+input[type="file"]:focus,
+select:focus,
+textarea:focus {
+  background: #ffffff !important;
+  border-color: var(--seza-blue) !important;
+  box-shadow: 0 0 0 4px rgba(47, 111, 182, .12) !important;
+  outline: none !important;
+}
+
+input[type="file"] {
+  color: #61728c !important;
+}
+
+input[type="file"]::file-selector-button {
+  background: #eaf2fc !important;
+  color: var(--seza-navy) !important;
+  border: 1px solid #bfd4ec !important;
+  border-radius: 8px !important;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--seza-blue) !important;
+  color: #ffffff !important;
+}
+
+.nss-mode label { color: #163b78 !important; }
+
+input[type="radio"] {
+  accent-color: var(--seza-blue) !important;
+}
+
+.help-link {
+  background: #eaf2fc !important;
+  color: var(--seza-navy) !important;
+  border-color: #bfd4ec !important;
+  border-radius: var(--seza-radius-sm) !important;
+}
+
+.help-link:hover {
+  background: var(--seza-blue) !important;
+  color: #ffffff !important;
+}
+
+button,
+.btn-primary-review,
+#review-finish-btn,
+#save-draft-btn,
+#review-revalidate-btn {
+  background: linear-gradient(135deg, #002673 0%, #2E7AF5 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: var(--seza-radius-sm) !important;
+  font-family: var(--seza-font-body) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 12px 24px rgba(36, 66, 143, .20) !important;
+}
+
+button:hover,
+.btn-primary-review:hover,
+#review-finish-btn:hover,
+#save-draft-btn:hover,
+#review-revalidate-btn:hover {
+  box-shadow: 0 16px 32px rgba(36, 66, 143, .26) !important;
+}
+
+.btn-secondary,
+.btn-outline-soft,
+.review-replace-btn,
+.btn-secondary-review {
+  background: #ffffff !important;
+  color: var(--seza-navy) !important;
+  border: 1px solid #c7d8ed !important;
+  box-shadow: 0 8px 18px rgba(36, 66, 143, .08) !important;
+  border-radius: var(--seza-radius-sm) !important;
+}
+
+.btn-secondary:hover,
+.btn-outline-soft:hover,
+.review-replace-btn:hover,
+.btn-secondary-review:hover {
+  background: #eef5ff !important;
+  border-color: var(--seza-blue) !important;
+}
+
+#err {
+  background: #fff4f2 !important;
+  color: #b42318 !important;
+  border: 1px solid #f2b8b5 !important;
+  border-left: 4px solid var(--seza-danger) !important;
+  border-radius: var(--seza-radius-sm) !important;
+}
+
+.nav-buttons {
+  border-top: 1px solid #dce8f7 !important;
+}
+
+/* Formulario activo: sin sidebar (distinto al layout SHIP) */
+body:not(.pre-registration) .left-panel {
+  display: none !important;
+}
+
+body:not(.pre-registration) .main-wrapper {
+  width: min(900px, 100%) !important;
+  max-width: 900px !important;
+}
+
+body:not(.pre-registration) .form-container {
+  padding: 32px 40px 44px !important;
+}
+
+body:not(.pre-registration) .form-header h2 {
+  font-size: clamp(26px, 3vw, 34px) !important;
+}
+
+body:not(.pre-registration) .progress-container {
+  padding: 20px 32px 18px !important;
+}
+
+.resume-card-logo {
+  display: flex !important;
+  justify-content: flex-start !important;
+  margin-bottom: 24px !important;
+}
+
+.resume-card-logo img {
+  width: 200px !important;
+  max-width: 88% !important;
+  height: auto !important;
+  object-fit: contain !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.resume-actions-card h3 {
+  margin-top: 16px !important;
+  color: var(--seza-page) !important;
+  font-family: var(--seza-font-body) !important;
+  font-style: normal !important;
+  font-size: clamp(34px, 5vw, 48px) !important;
+  font-weight: 900 !important;
+  line-height: 1.02 !important;
+  letter-spacing: -.6px !important;
+}
+
+.resume-intro,
+.resume-actions-card p {
+  color: var(--seza-muted) !important;
+  max-width: 440px !important;
+  font-size: 16px !important;
+  line-height: 1.55 !important;
+}
+
+.resume-trust-note {
+  margin: 28px 0 !important;
+  padding: 18px 20px !important;
+  background: #f8fbff !important;
+  border: 1px solid #d7e4f4 !important;
+  border-left: 4px solid var(--seza-blue) !important;
+  border-radius: var(--seza-radius-md) !important;
+  color: var(--seza-text) !important;
+}
+
+.resume-trust-note strong { color: var(--seza-navy) !important; }
+.resume-trust-note span { color: var(--seza-muted) !important; }
+
+.resume-actions-card h4 {
+  color: #10243f !important;
+  font-size: 17px !important;
+  font-weight: 900 !important;
+  margin: 28px 0 14px !important;
+}
+
+.resume-actions-row {
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+}
+
+.resume-kicker,
+.vacancy-kicker,
+.badge-official {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: auto !important;
+  background: #eef5ff !important;
+  color: var(--seza-navy) !important;
+  border: 1px solid #c7d8ed !important;
+  border-radius: 999px !important;
+  padding: 7px 14px !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: .5px !important;
+  text-transform: uppercase !important;
+}
+
+.resume-box,
+.vacancy-box {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.vacancy-options {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 12px !important;
+}
+
+.vacancy-option {
+  min-height: 118px;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: flex-start;
+  text-align: left !important;
+  padding: 16px !important;
+}
+
+.resume-note,
+.vacancy-title,
+.vacancy-option span {
+  color: var(--seza-muted) !important;
+}
+
+.vacancy-option strong {
+  font-size: 16px !important;
+  margin-bottom: 6px !important;
+}
+
+.vacancy-option span {
+  color: #61728c !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.vacancy-option:hover,
+.vacancy-option.active {
+  background: #eef5ff !important;
+  border-color: var(--seza-blue) !important;
+}
+
+/* Resumen IA y el resto del CSS de funcionalidades... */
+.review-screen {
+  background: #f8fbff !important;
+  border: 1px solid #d7e4f4 !important;
+  border-radius: var(--seza-radius-lg) !important;
+  box-shadow: var(--seza-shadow-md) !important;
+  color: var(--seza-text) !important;
+}
+
+.review-item,
+.review-stat,
+.review-score {
+  background: #ffffff !important;
+  border-color: #d7e4f4 !important;
+  color: var(--seza-text) !important;
+  border-radius: var(--seza-radius-md) !important;
+}
+
+.review-hero h2,
+.review-item-title,
+.review-stat strong {
+  color: var(--seza-navy) !important;
+}
+
+.review-hero p,
+.review-item-detail,
+.review-item-file,
+.review-stat small {
+  color: var(--seza-muted) !important;
+}
+
+.review-score {
+  background: linear-gradient(145deg, #eef5ff, #f8fbff) !important;
+}
+
+.btn-primary-review {
+  background: linear-gradient(135deg, #24428f, #2f6fb6) !important;
+}
+
+.review-item.approved {
+  background: #f0fdf8 !important;
+  border-color: #10b981 !important;
+}
+
+.review-item.warning {
+  background: #fff8e6 !important;
+  border-color: #f59e0b !important;
+}
+
+.review-item.rejected,
+.review-item.missing {
+  background: #fff4f2 !important;
+  border-color: #ef4444 !important;
+}
+
+.review-alert {
+  background: #fff8e6 !important;
+  border-color: rgba(245, 158, 11, .35) !important;
+  color: #b7791f !important;
+}
+
+.review-loading-overlay {
+  background: rgba(248, 251, 255, .95) !important;
+  border-color: #d7e4f4 !important;
+  color: var(--seza-text) !important;
+}
+
+.review-loading-spinner {
+  border-color: #d7e4f4 !important;
+  border-top-color: var(--seza-blue) !important;
+}
+
+.draft-toast,
+.archive-result {
+  background: #f0fdf8 !important;
+  border-color: rgba(15, 159, 110, .3) !important;
+  color: var(--seza-success) !important;
+}
+
+.archive-result a { color: var(--seza-blue) !important; }
+
+/* Modales */
+.app-modal-backdrop {
+  background: rgba(16, 36, 63, .35) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.app-modal-card,
+.section-toast {
+  background: #ffffff !important;
+  color: var(--seza-text) !important;
+  border: 1px solid #d7e4f4 !important;
+  border-radius: var(--seza-radius-lg) !important;
+  box-shadow: var(--seza-shadow-lg) !important;
+}
+
+.app-modal-icon {
+  background: #eef5ff !important;
+  color: var(--seza-navy) !important;
+}
+
+.app-modal-card.success .app-modal-icon {
+  background: #f0fdf8 !important;
+  color: var(--seza-success) !important;
+}
+
+.app-modal-card.error .app-modal-icon {
+  background: #fff4f2 !important;
+  color: var(--seza-danger) !important;
+}
+
+.app-modal-title,
+.section-toast-title {
+  color: var(--seza-navy) !important;
+}
+
+.app-modal-message,
+.section-toast-message {
+  color: var(--seza-muted) !important;
+}
+
+.app-modal-button {
+  background: var(--seza-blue) !important;
+  color: #ffffff !important;
+}
+
+.app-modal-spinner {
+  border-color: #d7e4f4 !important;
+  border-top-color: var(--seza-blue) !important;
+}
+
+/* Archivos y estados */
+.file-status,
+.recovered-file-control {
+  background: #f8fbff !important;
+  border-color: #d7e4f4 !important;
+  color: var(--seza-navy) !important;
+  border-radius: var(--seza-radius-sm) !important;
+}
+
+.file-status.is-ok,
+.maps-help.ok {
+  color: var(--seza-success) !important;
+  background: #f0fdf8 !important;
+}
+
+.file-status.is-error {
+  color: var(--seza-danger) !important;
+  background: #fff4f2 !important;
+}
+
+.file-status.is-validating,
+.maps-help.warn {
+  color: var(--seza-warning) !important;
+  background: #fff8e6 !important;
+}
+
+.file-status.is-selected {
+  color: var(--seza-navy) !important;
+}
+
+.recovered-file-control strong { color: var(--seza-success) !important; }
+.recovered-file-control small { color: var(--seza-muted) !important; }
+
+.recovered-file-replace {
+  background: var(--seza-blue) !important;
+  color: #ffffff !important;
+}
+
+.maps-help { color: var(--seza-muted) !important; }
+
+/* Snackbar */
+.section-validation-toast {
+  background: #ffffff !important;
+  color: var(--seza-text) !important;
+  border: 1px solid #d7e4f4 !important;
+  border-radius: var(--seza-radius-md) !important;
+  box-shadow: var(--seza-shadow-lg) !important;
+}
+
+.section-toast-icon {
+  background: #eef5ff !important;
+  border-color: #c7d8ed !important;
+  color: var(--seza-navy) !important;
+}
+
+.section-toast-content strong { color: var(--seza-navy) !important; }
+.section-toast-content span { color: var(--seza-muted) !important; }
+
+.section-toast-spinner {
+  border-color: #d7e4f4 !important;
+  border-top-color: var(--seza-blue) !important;
+}
+
+.section-validation-toast.success {
+  border-color: rgba(15, 159, 110, .34) !important;
+}
+
+.section-validation-toast.success .section-toast-icon {
+  background: #f0fdf8 !important;
+  border-color: rgba(15, 159, 110, .38) !important;
+  color: var(--seza-success) !important;
+}
+
+.section-validation-toast.warning .section-toast-icon {
+  background: #fff8e6 !important;
+  color: var(--seza-warning) !important;
+}
+
+.section-validation-toast.error .section-toast-icon {
+  background: #fff4f2 !important;
+  color: var(--seza-danger) !important;
+}
+
+.progress-step.validating .progress-dot {
+  border-color: var(--seza-blue) !important;
+  background: #eef5ff !important;
+}
+
+.progress-step.validating span::after {
+  color: var(--seza-blue) !important;
+}
+
+.progress-step.completed span::after {
+  color: var(--seza-success) !important;
+}
+
+.progress-dot-spinner {
+  border-color: #d7e4f4 !important;
+  border-top-color: var(--seza-blue) !important;
+}
+
+.review-compress-btn {
+  background: #fff8e6 !important;
+  border-color: rgba(245, 158, 11, .45) !important;
+  color: #b7791f !important;
+}
+
+/* =========================================================
+   PANTALLA INICIAL (Fondo Azul Inmersivo)
+   ========================================================= */
+html:has(body.pre-registration),
+body.pre-registration {
+  padding: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 100vh !important;
+  background: radial-gradient(circle at 10% 20%, #2E7AF5 0%, #002673 40%, #031438 100%) !important;
+  background-color: #031438 !important;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Ocultar elementos no deseados en la pantalla de inicio */
+body.pre-registration .seza-app-header,
+body.pre-registration .form-header,
+body.pre-registration #document-form,
+body.pre-registration .progress-container,
+body.pre-registration .left-panel {
+  display: none !important;
+}
+
+/* Transparencia absoluta en toda la cadena de contenedores del formulario */
+body.pre-registration .main-wrapper,
+body.pre-registration .resume-actions-card,
+body.pre-registration .wrapper,
+body.pre-registration .content-wrapper,
+body.pre-registration .container,
+body.pre-registration .container-fluid,
+body.pre-registration main,
+body.pre-registration section,
+body.pre-registration div[class*="wrapper"],
+body.pre-registration div[class*="card"]:not(.landing-workspace) {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: 100% !important;
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+}
+
+/* Forzar el layout de dos columnas real sin interferencias */
+body.pre-registration .landing-shell {
+  display: grid !important;
+  grid-template-columns: 1.1fr 0.9fr !important;
+  gap: 60px !important;
+  align-items: center !important;
+  min-height: 80vh !important;
+  width: min(1200px, 92%) !important;
+  margin: 0 auto !important;
+  padding: 40px 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* =========================================================
+   EL RECUADRO DE LOS BOTONES AHORA SÍ SERÁ EL BLANCO (SOLID)
+   ========================================================= */
+body.pre-registration .landing-workspace {
+  background: #ffffff !important; /* Blanco sólido y limpio */
+  border-radius: 28px !important;
+  padding: 40px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 24px !important;
+}
+
+/* El texto de indicación dentro del recuadro blanco debe ser oscuro para leerse */
+body.pre-registration .landing-workspace-label {
+  color: #555555 !important;
+  font-family: var(--seza-font-body) !important;
+  font-size: 16px !important;
+  text-align: center !important;
+  margin-bottom: 8px !important;
+  opacity: 1 !important;
+}
+
+/* Botones internos adaptados al contraste del fondo blanco */
+body.pre-registration .landing-segment-btn {
+  background: #f4f7fb !important; /* Gris muy claro */
+  color: #002673 !important;
+  border: 1px solid #e1e8f5 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.pre-registration .landing-segment-btn:hover {
+  background: #2E7AF5 !important; /* Se vuelve azul al pasar el mouse */
+  color: #ffffff !important;
+  transform: translateY(-4px) !important;
+  box-shadow: 0 12px 24px rgba(46, 122, 245, 0.25) !important;
+}
+
+body.pre-registration .landing-segment-btn:hover .landing-segment-icon {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+/* =========================================================
+   COLUMNA IZQUIERDA: Textos e Identidad en Blanco Puro
+   ========================================================= */
+body.pre-registration .landing-aside {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: #ffffff !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 24px !important;
+}
+
+.landing-security-badge {
+  position: relative !important;
+  display: inline-flex !important;
+  align-self: flex-start !important;
+  gap: 8px !important;
+  padding: 8px 16px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(10px) !important;
+  color: #ffffff !important;
+  font-family: var(--seza-font-body) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+}
+
+.landing-aside .resume-card-logo {
+  margin-bottom: 16px !important;
+  display: flex !important;
+}
+
+.landing-aside .resume-card-logo img {
+  width: 220px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.landing-title {
+  font-family: 'Squada One', sans-serif !important;
+  font-style: italic !important;
+  font-size: clamp(48px, 5vw, 64px) !important;
+  font-weight: 400 !important;
+  color: #ffffff !important;
+  line-height: 1.05 !important;
+  margin: 0 !important;
+}
+
+.landing-aside .resume-intro {
+  font-family: var(--seza-font-body) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 18px !important;
+  line-height: 1.6 !important;
+  max-width: 90% !important;
+  margin: 0 !important;
+}
+
+.landing-features {
+  list-style: none !important;
+  margin: 20px 0 0 !important;
+  padding: 0 !important;
+  display: grid !important;
+  gap: 16px !important;
+}
+
+.landing-features li {
+  font-family: var(--seza-font-body) !important;
+  font-size: 16px !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  padding-left: 28px !important;
+  position: relative !important;
+}
+
+.landing-features li::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 6px !important;
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  background: #fefefe !important;
+  box-shadow: 0 0 12px rgba(161, 193, 244, 0.8) !important;
+}
+
+/* =========================================================
+   COLUMNA DERECHA: Recuadro Blanco Translúcido (Glassmorphism)
+   ========================================================= */
+.landing-workspace {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 28px !important;
+  padding: 50px !important;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 32px !important;
+}
+
+.landing-workspace-label {
+  color: #ffffff !important;
+  font-family: var(--seza-font-body) !important;
+  font-size: 18px !important;
+  text-align: left !important;
+  margin: 0 !important;
+  opacity: 0.95 !important;
+}
+
+.landing-segment {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 20px !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Botones internos en Blanco Sólido */
+.landing-segment-btn {
+  background: #ffffff !important;
+  color: #002673 !important;
+  border-radius: 24px !important;
+  padding: 20px 24px !important;
+  min-height: 90px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 24px !important;
+  border: 1px solid transparent !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease !important;
+  font-family: var(--seza-font-body) !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  width: 100% !important;
+}
+
+.landing-segment-btn:hover {
+  transform: translateY(-6px) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25) !important;
+  border-color: #2E7AF5 !important;
+}
+
+.landing-segment-icon {
+  width: 64px !important;
+  height: 64px !important;
+  font-size: 28px !important;
+  background: #f4f7fb !important;
+  color: #2E7AF5 !important;
+  border-radius: 18px !important;
+  display: grid !important;
+  place-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* =========================================================
+   RESPONSIVE: Pantallas pequeñas
+   ========================================================= */
+@media (max-width: 980px) {
+  body.pre-registration .landing-shell {
+    grid-template-columns: 1fr !important;
+    gap: 40px !important;
+  }
+
+  .landing-workspace {
+    padding: 30px 20px !important;
+    border-radius: 20px !important;
+  }
+}
+
+/* 1. Forzar fondo en el body */
+body.pre-registration {
+  background: #002673 !important; 
+}
+
+/* 2. Anulación de cualquier contenedor que fuerce blanco */
+body.pre-registration .main-wrapper,
+body.pre-registration .main-wrapper *, 
+body.pre-registration .landing-shell,
+body.pre-registration .landing-aside {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* 3. Asegurar que solo la tarjeta de la derecha sea blanca */
+body.pre-registration .landing-workspace {
+  background: #ffffff !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
+}
+
+/* 4. Asegurar que los textos a la izquierda sean blancos */
+body.pre-registration .landing-title,
+body.pre-registration .landing-aside {
+  color: #ffffff !important;
+}
+
+/* =========================================================
+  Logo y Degradado Azul
+   ========================================================= */
+
+/* 1. Degradado Azul Premium (Sustituye el fondo plano) */
+body.pre-registration {
+  background: radial-gradient(circle at 10% 20%, #2E7AF5 0%, #002673 100%) !important;
+}
+
+/* 2. Logo más pequeño (Ajusta el valor de 'width' a tu gusto) */
+body.pre-registration .landing-aside .resume-card-logo img {
+  width: 160px !important; /* Original era 220px, lo redujimos */
+  height: auto !important;
+  transition: width 0.3s ease !important;
+}
+
+/* 3. Ajuste opcional: Espaciado para que el logo más pequeño no se vea descolocado */
+body.pre-registration .landing-aside {
+  gap: 16px !important; /* Reducimos el gap para que el logo se vea proporcional */
+}
+
+/* =========================================================
+   GLASSMORPHISM ESPECÍFICO
+   ========================================================= */
+
+/* 1. Badge "Proceso Seguro" con efecto Glass */
+body.pre-registration .landing-security-badge {
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(15px) !important;
+  -webkit-backdrop-filter: blur(15px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  padding: 10px 20px !important;
+  border-radius: 50px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 2. Botones con efecto Glass (Blanco translúcido) */
+body.pre-registration .landing-segment-btn {
+  background: #2E7AF5 !important; /* Base translúcida */
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 2px solid #2e7af596 !important;
+  color: #ffffff !important; /* Color del Texto  */
+  transition: all 0.4s ease !important;
+}
+
+/* Efecto al pasar el mouse: se vuelve verde sólido o más intenso */
+body.pre-registration .landing-segment-btn:hover {
+  background: rgba(46, 204, 113, 0.8) !important; /* Verde con opacidad */
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-5px) !important;
+}
+
+/* Asegurar que los iconos dentro del botón también sean blancos */
+body.pre-registration .landing-segment-btn .landing-segment-icon {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+/* =========================================================
+   AJUSTE DE CORRECCIÓN PARA HEADER Y LAYOUT
+   ========================================================= */
+
+/* 1. Evitar que el Header fijo tape el contenido */
+body {
+  padding-top: 64px !important; /* Altura del header para que el contenido empiece debajo */
+}
+
+/* 2. Ajuste para que el formulario principal no se corte */
+.form-container {
+  overflow-y: auto !important;
+  height: calc(100vh - 64px) !important; /* Altura total menos el header */
+  padding-top: 10px !important;
+}
+
+/* 3. Asegurar que los pasos (1, 2, 3, 4) se vean bien y no sean tapados */
+.progress-container {
+  position: relative !important;
+  z-index: 10 !important;
+  background: #ffffff !important;
+  padding-top: 50px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid var(--seza-line) !important;
+}
+
+/* 4. Mejora responsiva para el Landing */
+@media (max-width: 980px) {
+  /* Asegurar que el landing no tenga desbordamiento */
+  body.pre-registration {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* Ajuste de contenedor landing */
+  body.pre-registration .landing-shell {
+    margin-top: 40px !important;
+    margin-bottom: 40px !important;
+  }
+
+}
+
+/* =========================================================
+   SOLUCIÓN DEFINITIVA: Desbloqueo de elementos cortados
+   ========================================================= */
+@media (max-width: 980px) {
+  /* 1. Eliminar restricciones de altura y permitir scroll en todo el cuerpo */
+  html, body.pre-registration {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-top: 0 !important;
+  }
+
+  /* 2. El contenedor padre debe adaptarse al contenido y no a la pantalla */
+  .landing-shell {
+    display: block !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    padding: 20px 15px !important;
+    margin: 0 !important;
+    position: relative !important;
+    overflow: visible !important; /* IMPORTANTE: permite que nada se oculte */
+  }
+
+  /* 3. Asegurar que el logo tenga espacio y no tenga margen negativo */
+  .landing-aside .resume-card-logo {
+    display: flex !important;
+    justify-content: center !important;
+    margin: 20px auto !important; /* Espacio superior para que no se corte */
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+  }
+
+  /* 4. Asegurar que la imagen sea pequeña y visible */
+  .landing-aside .resume-card-logo img {
+    width: 120px !important; 
+    height: auto !important;
+    display: block !important;
+  }
+
+  /* 5. Asegurar que el área de contenido (workspace) no se corte */
+  .landing-workspace {
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 20px 0 !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+}
+
+/* ================= RESPONSIVE REBUILD ================= */
+html{min-height:100%}
+body.pre-registration{
+min-height:100vh!important;
+height:auto!important;
+overflow-x:hidden!important;
+overflow-y:auto!important;
+}
+body.pre-registration .landing-shell{
+width:min(1280px,92%)!important;
+display:grid!important;
+grid-template-columns:minmax(420px,1fr) minmax(420px,560px)!important;
+gap:clamp(40px,6vw,90px)!important;
+align-items:center!important;
+min-height:100vh!important;
+padding:clamp(40px,5vw,70px) 0!important;
+}
+body.pre-registration .landing-aside{
+display:flex!important;
+flex-direction:column!important;
+justify-content:center!important;
+align-items:flex-start!important;
+max-width:620px!important;
+gap:22px!important;
+}
+body.pre-registration .resume-card-logo{display:flex!important;justify-content:flex-start!important;margin:0 0 10px!important}
+body.pre-registration .resume-card-logo img{width:clamp(130px,18vw,220px)!important;height:auto!important}
+body.pre-registration .landing-workspace{
+width:100%!important;
+max-width:560px!important;
+margin:auto!important;
+padding:clamp(24px,3vw,46px)!important;
+}
+@media(max-width:991px){
+body{padding-top:0!important}
+body.pre-registration .landing-shell{
+display:flex!important;
+flex-direction:column!important;
+width:min(100%,700px)!important;
+min-height:auto!important;
+padding:40px 22px 60px!important;
+gap:36px!important;
+}
+body.pre-registration .landing-aside{align-items:center!important;text-align:center!important}
+body.pre-registration .resume-card-logo{justify-content:center!important}
+body.pre-registration .resume-card-logo img{width:170px!important;max-width:70vw!important}
+body.pre-registration .landing-title{font-size:clamp(44px,9vw,60px)!important}
+body.pre-registration .landing-workspace{max-width:560px!important}
+}
+@media(max-width:576px){
+body.pre-registration .landing-shell{padding:30px 18px 50px!important}
+body.pre-registration .resume-card-logo img{width:140px!important}
+body.pre-registration .landing-title{font-size:52px!important}
+body.pre-registration .landing-workspace{padding:22px!important}
+}
+
+/* Empuja el contenido hacia abajo para que el header fijo no tape el formulario */
+body:not(.pre-registration) {
+  padding-top: 74px !important; 
+}
+
+/* Evita que los anclajes de scroll queden ocultos por el header */
+html {
+  scroll-padding-top: 74px !important;
+}
+
+/* Reducción de tipografía para dispositivos móviles */
+@media (max-width: 980px) {
+  
+  /* Títulos principales */
+  .landing-title { font-size: 30px !important; }
+  .form-header h2 { font-size: 24px !important; }
+  .resume-actions-card h3 { font-size: 28px !important; }
+  
+  /* Textos secundarios y descripciones */
+  .landing-aside .resume-intro,
+  .landing-workspace-label,
+  .form-header p, 
+  .muted { 
+    font-size: 15px !important; 
+  }
+  
+  /* Botones grandes del Landing */
+  .landing-segment-btn { 
+    font-size: 16px !important; 
+    padding: 16px 20px !important;
+  }
+  
+  /* Inputs, botones y etiquetas del formulario */
+  label, 
+  input[type="text"], 
+  select, 
+  textarea, 
+  button { 
+    font-size: 14px !important; 
+  }
+
+  /* 1. Centrar el botón de PROCESO SEGURO */
+  .landing-security-badge {
+    align-self: center !important;
+    margin: 0 auto 16px auto !important;
+  }
+
+  /* Instrucciones */
+  .landing-features {
+    align-self: flex-start !important; /* Lo mueve a la izquierda */
+    text-align: left !important;
+    font-size: 16px !important;
+    width: 100% !important;
+    padding-left: 10px !important;     /* Pequeño margen para que no pegue al borde de la pantalla */
+    box-sizing: border-box !important;
+  }
+}
+
+/* =========================================================
+  Limpieza total de fondo
+   ========================================================= */
+
+#landing-panel-vacancy .vacancy-options .vacancy-option,
+button.vacancy-option,
+.vacancy-option {
+    /* 1. Fondo forzado a azul transparente */
+    background-color: rgba(46, 122, 245, 0.2) !important;
+    background-image: none !important;
+    box-shadow: 0 8px 20px rgba(0, 38, 115, 0.15) !important;
+    /* 2. Eliminación de cualquier estilo de borde previo */
+    border: 1px solid rgba(46, 122, 245, 0.4) !important;
+    
+    /* 3. Asegurar que el efecto Glass se aplique */
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    
+    /* 4. Resetear cualquier estado de visualización */
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 5. Asegurar que el estado hover sea el único que cambie el fondo */
+#landing-panel-vacancy .vacancy-options .vacancy-option:hover,
+button.vacancy-option:hover {
+    background-color: rgba(46, 122, 245, 0.5) !important;
+    border-color: #2E7AF5 !important;
+    /* Sombra más profunda al pasar el cursor */
+    box-shadow: 0 15px 30px rgba(0, 38, 115, 0.25) !important;
+}
+
+/* =========================================================
+   ESTILOS PARA MÓDULO: RECUPERAR AVANCE
+   ========================================================= */
+
+/* 1. Caja de texto CURP (Borde reforzado) */
+#resume-curp {
+    border: 2px solid var(--seza-blue) !important;
+    background: #ffffff !important;
+    border-radius: var(--seza-radius-sm) !important;
+    padding: 12px 16px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    transition: all 0.3s ease !important;
+}
+
+#resume-curp:focus {
+    border-color: #002673 !important;
+    box-shadow: 0 0 0 4px rgba(46, 122, 245, 0.15) !important;
+    outline: none !important;
+}
+
+/* 2. Botón Buscar (Degradado azul y sombra) */
+#load-draft-btn {
+    background: linear-gradient(135deg, #002673 0%, #2E7AF5 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: var(--seza-radius-sm) !important;
+    font-weight: 700 !important;
+    padding: 12px 24px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 12px rgba(46, 122, 245, 0.3) !important;
+}
+
+#load-draft-btn:hover {
+    filter: brightness(1.1) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(46, 122, 245, 0.4) !important;
+}
+
+.swal2-popup, 
+.swal-modal, 
+.app-modal-card {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid #d7e4f4 !important;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15) !important;
+}
+
+/* Boton Buscar */
+.swal2-confirm, 
+.swal-button, 
+.app-modal-button {
+    background: linear-gradient(135deg, #002673 0%, #2E7AF5 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+/* Aseguramos que el fondo del área de clic (backdrop) no sea invadido */
+.swal2-container, 
+.app-modal-backdrop {
+    background-color: rgba(16, 36, 63, 0.4) !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+/* =========================================================
+   ESTILO SELECTIVO: Solo para mensajes de error
+   ========================================================= */
+
+/* 1. Solo afecta a las alertas de error: texto legible sobre tarjeta blanca */
+.app-modal-card.error .app-modal-title {
+    color: #b42318 !important;
+    text-shadow: none !important;
+}
+
+.app-modal-card.error .app-modal-message {
+    color: #475467 !important;
+    text-shadow: none !important;
+}
+
+/* 2. Icono de error con contraste suficiente */
+.app-modal-card.error .app-modal-icon {
+    background: #fee4e2 !important;
+    color: #d92d20 !important;
+}
+
+/* 3. El botón conserva la identidad visual y vuelve a ser legible */
+.app-modal-card.error .app-modal-button {
+    background: linear-gradient(135deg, #002673 0%, #2E7AF5 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 6px 16px rgba(46, 122, 245, 0.24) !important;
+}
+
+/* =========================================================
+   1. BOTONES GRANDES: Estado Activo (Verde)
+   ========================================================= */
+/* Asumiendo que tus botones tienen una clase como .vacancy-option */
+.vacancy-option.active, 
+.vacancy-option:active,
+.vacancy-option.selected {
+    border: 2px solid #0f9f6e !important;
+    background-color: #f0fdf8 !important;
+    box-shadow: 0 0 0 4px rgba(15, 159, 110, 0.1) !important;
+}
+
+/* =========================================================
+   FORZADO DE BOTONES: Sobrescribir estilos nativos
+   ========================================================= */
+
+/* 1. Botones de "Elegir archivo" (input type="file" estilizado o botón asociado) */
+button, 
+.button, 
+input[type="button"], 
+input[type="file"]::-webkit-file-upload-button,
+.btn {
+    background: linear-gradient(135deg, #002673 0%, #2E7AF5 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700 !important;
+}
+
+/* 2. Específicamente para los botones que dicen "Elegir archivo" */
+/* Si el botón es un <button> que contiene el texto "Elegir archivo" */
+button:contains("Elegir archivo"), 
+.custom-file-upload {
+    background: linear-gradient(135deg, #002673 0%, #2E7AF5 100%) !important;
+    color: #ffffff !important;
+}
+
+/* 3. Botones de "Consultar" (que tienen la flecha ->) */
+/* Usamos el selector de atributo para apuntar a botones que contengan texto de consulta */
+button[id*="consult"], 
+.consult-btn {
+    background: linear-gradient(135deg, #002673 0%, #2E7AF5 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+/* =========================================================
+   3. NOTAS DE AYUDA (Borde lateral y tamaño)
+   ========================================================= */
+.maps-help {
+    font-size: 14px !important; /* Más grande */
+    line-height: 1.5 !important;
+    margin-top: 10px !important;
+    padding-left: 12px !important; /* Espacio para el borde */
+    border-left: 4px solid #61728c !important; /* Color base */
+}
+
+/* Nota Amarilla (Advertencia) */
+.maps-help.warn {
+    color: #b45309 !important;
+    border-left-color: #fbbf24 !important; /* Línea amarilla fuerte */
+    background: #fffbeb !important;
+    padding: 8px 12px !important;
+    border-radius: 0 4px 4px 0 !important;
+}
+
+/* Nota Roja (Error/Atención) */
+.maps-help.error {
+    color: #b91c1c !important;
+    border-left-color: #ef4444 !important; /* Línea roja fuerte */
+    background: #fef2f2 !important;
+    padding: 8px 12px !important;
+    border-radius: 0 4px 4px 0 !important;
+}
+
+/* =========================================================
+   SOLUCIÓN DE EMERGENCIA: Anti-desborde no invasivo
+   ========================================================= */
+
+/* 1. Evita que cualquier elemento sea más ancho que su contenedor */
+* {
+    box-sizing: border-box !important;
+}
+
+/* 2. Regla maestra para que el texto NO estire las cajas */
+body, html {
+    overflow-x: hidden !important; /* Corta cualquier cosa que se salga a la derecha */
+    width: 100% !important;
+}
+
+/* 3. Limita cualquier contenedor que contenga texto para que se ajuste */
+div, section, article, aside, main {
+    max-width: 100% !important;
+    word-wrap: break-word !important;
+}
