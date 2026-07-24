@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <title>SEZA Utils</title>
+  <link rel="stylesheet" href="/utils/utils.css" />
+</head>
+<body>
+  <main class="shell">
+    <section id="login-view" class="auth-card hidden">
+      <div class="brand">
+        <div class="brand-mark">SEZA</div>
+        <div>
+          <h1>Utilidades administrativas</h1>
+          <p>Acceso privado para gestión documental.</p>
+        </div>
+      </div>
+
+      <form id="login-form" class="stack">
+        <label>
+          Usuario
+          <input id="login-username" name="username" autocomplete="username" required />
+        </label>
+        <label>
+          Contraseña
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary" type="submit">Ingresar</button>
+        <p id="login-error" class="error-text hidden"></p>
+      </form>
+    </section>
+
+    <section id="app-view" class="hidden">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">GRUPO SEZA</p>
+          <h1>Gestión documental de drivers</h1>
+          <p class="muted">Consulta, corrección documental y generación de credenciales desde Google Sheets.</p>
+        </div>
+        <div class="top-actions">
+          <span id="session-user" class="user-chip"></span>
+          <button id="logout-btn" class="ghost" type="button">Cerrar sesión</button>
+        </div>
+      </header>
+
+      <section class="toolbar card">
+        <div class="search-wrap">
+          <input id="search-input" placeholder="Buscar nombre, CURP, RFC, teléfono, credencial..." />
+        </div>
+        <select id="status-filter">
+          <option value="">Todos los estados</option>
+          <option>APROBADO</option>
+          <option>APROBADO_CON_OBSERVACIONES</option>
+          <option>PENDIENTE_CREDENCIAL</option>
+          <option>CON_ERRORES</option>
+          <option>BORRADOR</option>
+          <option>AVANCE_GUARDADO</option>
+        </select>
+        <button id="refresh-btn" class="ghost" type="button">Actualizar</button>
+      </section>
+
+      <section class="card table-card">
+        <div class="table-head">
+          <div>
+            <strong id="result-count">0 drivers</strong>
+            <span id="page-info" class="muted"></span>
+          </div>
+          <div class="pager">
+            <button id="prev-btn" class="ghost small" type="button">Anterior</button>
+            <button id="next-btn" class="ghost small" type="button">Siguiente</button>
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Fila</th>
+                <th>Driver</th>
+                <th>CURP</th>
+                <th>Vacante</th>
+                <th>Estado</th>
+                <th>Rechazados</th>
+                <th>Observaciones</th>
+                <th>Credencial</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="drivers-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">EXPEDIENTE</p>
+          <h2 id="detail-title">Driver</h2>
+          <p id="detail-subtitle" class="muted"></p>
+        </div>
+        <button id="close-modal" class="icon-btn" type="button" aria-label="Cerrar">×</button>
+      </div>
+
+      <div id="detail-alert" class="notice hidden"></div>
+
+      <div class="detail-layout">
+        <section class="card inner-card">
+          <div class="section-title">
+            <h3>Datos del driver</h3>
+            <span id="detail-status"></span>
+          </div>
+
+          <form id="driver-form" class="form-grid">
+            <label>Tipo de vacante
+              <select name="tipoVacante">
+                <option value="">Sin definir</option>
+                <option>Driver</option>
+                <option>Chofer</option>
+                <option>Ayudante</option>
+              </select>
+            </label>
+            <label>Nombre completo
+              <input name="nombre" />
+            </label>
+            <label>Teléfono
+              <input name="telefono" />
+            </label>
+            <label>CURP
+              <input name="curp" maxlength="18" />
+            </label>
+            <label>RFC
+              <input name="rfc" />
+            </label>
+            <label>NSS
+              <input name="nss" maxlength="11" />
+            </label>
+            <label>Banco
+              <input name="banco" />
+            </label>
+            <label>CLABE
+              <input name="clabe" maxlength="18" />
+            </label>
+            <label class="full">Dirección
+              <textarea name="direccion" rows="3"></textarea>
+            </label>
+          </form>
+
+          <div class="button-row">
+            <button id="save-driver-btn" class="primary" type="button">Guardar cambios</button>
+            <a id="folder-link" class="ghost link-button hidden" target="_blank" rel="noopener">Abrir carpeta Drive</a>
+          </div>
+        </section>
+
+        <aside class="card inner-card credential-card">
+          <h3>Credencial</h3>
+          <div class="credential-state">
+            <span id="credential-badge" class="badge neutral">Sin credencial</span>
+          </div>
+          <p id="credential-info" class="muted"></p>
+          <div class="stack">
+            <a id="credential-link" class="ghost link-button hidden" target="_blank" rel="noopener">Abrir credencial</a>
+            <button id="generate-credential-btn" class="primary" type="button">Crear / regenerar credencial</button>
+          </div>
+        </aside>
+      </div>
+
+      <section class="card inner-card">
+        <div class="section-title">
+          <h3>Incidencias documentales</h3>
+        </div>
+        <div class="issues-grid">
+          <div>
+            <h4>Rechazados</h4>
+            <pre id="rejected-detail" class="issue-box"></pre>
+          </div>
+          <div>
+            <h4>Con observación</h4>
+            <pre id="warning-detail" class="issue-box"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="card inner-card">
+        <div class="section-title">
+          <h3>Documentos</h3>
+          <p class="muted">Al reemplazar un archivo se vuelve a validar y se actualiza el Sheet automáticamente.</p>
+        </div>
+        <div id="documents-grid" class="documents-grid"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="busy-overlay" class="busy hidden">
+    <div class="spinner"></div>
+    <p id="busy-text">Procesando...</p>
+  </div>
+
+  <script src="/utils/utils.js" defer></script>
+</body>
+</html>

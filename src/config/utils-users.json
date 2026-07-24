@@ -1,0 +1,12 @@
+{
+  "sessionHours": 8,
+  "sessionSecret": "DbEdWZqTH_r6hg9swq36wWSPOvq1Yz3FjW8zQsDDyFRx9TecAxDLzjNgUzxtC132",
+  "users": [
+    {
+      "username": "seza-utils",
+      "password": "DphRsDcN2!eAmk5J7i7X",
+      "name": "Administrador SEZA",
+      "active": true
+    }
+  ]
+}

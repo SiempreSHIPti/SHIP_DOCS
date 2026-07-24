@@ -15,6 +15,7 @@ const { documentValidationRealtimeRouter } = require("./routes/documentValidatio
 const { finalDocumentReviewRouter } = require("./routes/finalDocumentReview");
 const { saveLocalRegistrationRouter } = require("./routes/saveLocalRegistration");
 const { draftLocalRegistrationRouter } = require("./routes/draftLocalRegistration");
+const { utilsAdminRouter } = require("./routes/utilsAdmin");
 function buildApp() {
   const app = express();
 
@@ -42,6 +43,14 @@ function buildApp() {
   // Parsers (multipart lo maneja multer en /submit)
   app.use(express.urlencoded({ extended: true, limit: "256kb" }));
   app.use(express.json({ limit: "256kb" }));
+
+  // Ruta administrativa privada: no se enlaza desde el portal público.
+  // El panel se abre únicamente conociendo /utils; todos los datos y escrituras requieren login.
+  app.get(["/utils", "/utils/"], (_req, res) => {
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    res.sendFile(path.join(process.cwd(), "public", "utils", "index.html"));
+  });
 
   // Static
   app.use(express.static(path.join(process.cwd(), "public")));
@@ -79,6 +88,7 @@ function buildApp() {
   app.use(assertMiddleware("finalDocumentReviewRouter", finalDocumentReviewRouter));
   app.use(assertMiddleware("saveLocalRegistrationRouter", saveLocalRegistrationRouter));
   app.use(assertMiddleware("draftLocalRegistrationRouter", draftLocalRegistrationRouter));
+  app.use(assertMiddleware("utilsAdminRouter", utilsAdminRouter));
 
   // Health simple para Cloud Run y monitoreo.
   app.get("/healthz", (_, res) => res.status(200).send("ok"));
