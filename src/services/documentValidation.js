@@ -294,14 +294,21 @@ Analiza visualmente/OCR el documento y responde SOLO JSON válido con esta estru
 Reglas:
 - ok debe ser true sólo si el documento corresponde al tipo esperado, es legible y cumple la coincidencia de nombre cuando aplique.
 - La coincidencia de nombre debe evaluarse ignorando acentos/diacríticos y diferencias menores de mayúsculas/minúsculas. Ejemplo: JOSE = JOSÉ, MARTIN = MARTÍN, GONZALEZ = GONZÁLEZ.
-- Si es estado de cuenta, extrae SIEMPRE que sea visible el banco emisor y la CLABE interbancaria de 18 dígitos.
-- Para estado de cuenta, guarda banco en fields.banco y la CLABE en fields.clabe. Si aparece separada con espacios o guiones, devuélvela sólo con 18 dígitos.
-- Si no encuentras CLABE de 18 dígitos pero hay número de cuenta, colócalo en fields.cuenta.
-- Si falta el titular, CLABE/cuenta o no es legible, recommendation debe ser reject o manual_review.
+- REGLAS ESPECIALES PARA ESTADO DE CUENTA / COMPROBANTE BANCARIO:
+  - Se acepta un estado de cuenta PDF/imagen o una fotografía/captura de pantalla de la app, banca web o pantalla bancaria. NO rechaces este documento únicamente por ser captura de pantalla.
+  - Para aprobar una captura bancaria deben verse claramente: (1) logo o marca identificable del banco, (2) nombre del titular y (3) CLABE interbancaria de 18 dígitos.
+  - Guarda el banco en fields.banco, indica fields.bankLogoDetected=true cuando el logo/marca sea visualmente identificable, fields.bankLogoText con el texto o marca detectada y fields.isBankAppScreenshot=true cuando sea captura/foto de pantalla.
+  - Guarda la CLABE en fields.clabe sólo con 18 dígitos, aun si visualmente aparece separada con espacios o guiones.
+  - No basta con un número de cuenta: para aprobación automática de este campo debe existir CLABE de 18 dígitos.
+  - El nombre del titular debe corresponder al nombre esperado del driver ignorando acentos y diferencias menores de OCR.
+  - No exijas periodo, fecha de corte ni formato de estado de cuenta tradicional cuando la evidencia provenga de banca móvil/web.
 - Si el documento esperado es Comprobante de domicilio, valida únicamente que sea un comprobante real/válido, legible y que contenga domicilio/emisor/periodo o datos suficientes. No lo rechaces si está a nombre de otra persona.
-- Si el documento esperado es Tarjeta de circulación o Póliza de seguro, valida que el documento sea real/válido aunque no esté a nombre del driver.
-- Para Tarjeta de circulación o Póliza de seguro, si detectas propietario/asegurado/titular, colócalo en nameFound y también en fields.ownerName, fields.propietario o fields.asegurado.
-- Para Tarjeta de circulación o Póliza de seguro, si el documento es válido pero no está a nombre del driver, no lo rechaces por nombre; usa recommendation manual_review, ok true y explica la observación.
+- REGLAS ESPECIALES PARA TARJETA DE CIRCULACIÓN / PERMISO GUBERNAMENTAL:
+  - Además de una tarjeta de circulación, acepta permisos, autorizaciones, constancias o documentos oficiales emitidos por CUALQUIER autoridad gubernamental federal, estatal o municipal, siempre que el archivo sea legible y tenga formato oficial reconocible.
+  - Para un permiso gubernamental no exijas que aparezcan placa, serie, vehículo o nombre del driver si el propio formato del permiso no los contiene.
+  - Identifica la autoridad/dependencia en fields.autoridad_emisora o fields.dependencia_gobierno; guarda el folio en fields.folio_permiso cuando exista; marca fields.isGovernmentPermit=true y fields.isOfficialGovernmentFormat=true cuando corresponda.
+  - Si es una tarjeta de circulación tradicional, conserva la validación normal del documento. Si está a nombre de otra persona, no la rechaces por nombre; puede quedar como observación no bloqueante.
+- Para Póliza de seguro, si detectas asegurado/titular, colócalo en nameFound y fields.asegurado. Si es válida pero no está a nombre del driver, no la rechaces por nombre; usa recommendation manual_review, ok true y explica la observación.
 - REGLAS ESPECIALES PARA FOTO PERSONAL / SELFIE:
   - Debe aparecer exactamente una persona real, con el rostro visible, suficientemente grande y enfocado.
   - Debe parecer una captura directa de cámara de la persona presente frente al dispositivo.
