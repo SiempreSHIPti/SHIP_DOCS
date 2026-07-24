@@ -7,6 +7,7 @@ const PDFDocument = require("pdfkit");
 const mime = require("mime-types");
 const { ENV } = require("../config/env");
 const { evaluateCredentialEligibility } = require("./credentialEligibility");
+const { normalizeClabe, isValidClabe, resolveBankName } = require("../utils/clabe");
 
 const SHIP_CREDENTIAL_FRONT_TEMPLATE = path.join(__dirname, "../assets/credential/ship-credential-front-template.jpg");
 const SHIP_CREDENTIAL_BACK_TEMPLATE = path.join(__dirname, "../assets/credential/ship-credential-back-template.jpg");
@@ -196,20 +197,18 @@ function extractClabeFromText(value) {
   const text = String(value || "");
   if (!text.trim()) return "";
 
+  const candidates = [];
   const contextual = text.match(/(?:CLABE|CLABE INTERBANCARIA|CUENTA CLABE|INTERBANCARIA)[^\d]*(\d[\d\s-]{16,34}\d)/i);
-  if (contextual?.[1]) {
-    const digits = contextual[1].replace(/\D/g, "");
-    if (digits.length >= 18) return digits.slice(0, 18);
-  }
+  if (contextual?.[1]) candidates.push(normalizeClabe(contextual[1]));
 
   const contiguous = text.match(/\b\d{18}\b/);
-  if (contiguous?.[0]) return contiguous[0];
+  if (contiguous?.[0]) candidates.push(normalizeClabe(contiguous[0]));
 
   const compact = text.replace(/[^\d]/g, "");
   const mostlyDigits = text.replace(/[\d\s-]/g, "").trim().length <= 3;
-  if (mostlyDigits && compact.length >= 18) return compact.slice(0, 18);
+  if (mostlyDigits && compact.length >= 18) candidates.push(normalizeClabe(compact));
 
-  return "";
+  return candidates.find((candidate) => isValidClabe(candidate)) || "";
 }
 
 function getEstadoCuentaRow(reviewPayload = {}) {
@@ -336,6 +335,11 @@ function normalizeBody(body = {}, reviewPayload = {}) {
   const constanciaRow = findReviewRow(reviewPayload, "constancia");
   const bankFromReview = extractBankFromReview(reviewPayload);
   const clabeFromReview = extractClabeFromReview(reviewPayload);
+  const clabeResolved = extractClabeFromText(firstNonEmpty(get("clabe", "clabeTxt"), clabeFromReview));
+  const bankResolution = resolveBankName({
+    clabe: clabeResolved,
+    candidates: [bankFromReview, get("banco")],
+  });
 
   const curpFromReview = firstNonEmpty(
     curpRow?.fields?.curp,
@@ -363,9 +367,9 @@ function normalizeBody(body = {}, reviewPayload = {}) {
     nombre: get("nombre").toUpperCase(),
     telefono: get("telefono").replace(/\D/g, "").slice(0, 10),
     direccion: get("direccion"),
-    banco: normalizeBankName(firstNonEmpty(get("banco"), bankFromReview)),
+    banco: normalizeBankName(bankResolution.name || firstNonEmpty(bankFromReview, get("banco"))),
     clabeMode: get("clabe_mode") || "archivo",
-    clabeTxt: extractClabeFromText(firstNonEmpty(get("clabe", "clabeTxt"), clabeFromReview)),
+    clabeTxt: clabeResolved,
     nssMode: get("nss_mode"),
     nssNum: normalizeNss(firstNonEmpty(get("nss_num", "nssNum"), nssFromReview)),
     rfc: normalizeRfc(firstNonEmpty(get("rfc"), rfcFromReview)),

@@ -2,6 +2,7 @@
 const axios = require("axios");
 const { ENV } = require("../config/env");
 const { slog } = require("../utils/log");
+const { normalizeClabe, isValidClabe, resolveBankName } = require("../utils/clabe");
 
 const DOC_RULES = {
   ine_frontal: {
@@ -75,11 +76,11 @@ const DOC_RULES = {
     requiredEvidence: ["aseguradora", "poliza", "vigencia", "vehiculo"],
   },
   estado_cuenta: {
-    label: "Estado de cuenta bancario",
-    expectedType: "estado_cuenta_bancario",
+    label: "Estado de cuenta / comprobante bancario",
+    expectedType: "estado_cuenta_o_captura_bancaria",
     requireNameMatch: true,
-    minConfidence: 0.76,
-    requiredEvidence: ["nombre_titular", "banco", "clabe_o_cuenta", "periodo_o_fecha"],
+    minConfidence: 0.70,
+    requiredEvidence: ["logo_o_marca_banco_o_codigo_clabe", "nombre_titular", "clabe_interbancaria_18_digitos"],
   },
   selfie: {
     label: "Foto personal / selfie",
@@ -265,6 +266,9 @@ Analiza visualmente/OCR el documento y responde SOLO JSON válido con esta estru
   "confidence": number,
   "fields": {
     "banco": string|null,
+    "bankLogoDetected": boolean|null,
+    "bankLogoText": string|null,
+    "isBankAppScreenshot": boolean|null,
     "clabe": string|null,
     "clabe_interbancaria": string|null,
     "cuenta_clabe": string|null,
@@ -296,12 +300,14 @@ Reglas:
 - La coincidencia de nombre debe evaluarse ignorando acentos/diacríticos y diferencias menores de mayúsculas/minúsculas. Ejemplo: JOSE = JOSÉ, MARTIN = MARTÍN, GONZALEZ = GONZÁLEZ.
 - REGLAS ESPECIALES PARA ESTADO DE CUENTA / COMPROBANTE BANCARIO:
   - Se acepta un estado de cuenta PDF/imagen o una fotografía/captura de pantalla de la app, banca web o pantalla bancaria. NO rechaces este documento únicamente por ser captura de pantalla.
-  - Para aprobar una captura bancaria deben verse claramente: (1) logo o marca identificable del banco, (2) nombre del titular y (3) CLABE interbancaria de 18 dígitos.
-  - Guarda el banco en fields.banco, indica fields.bankLogoDetected=true cuando el logo/marca sea visualmente identificable, fields.bankLogoText con el texto o marca detectada y fields.isBankAppScreenshot=true cuando sea captura/foto de pantalla.
+  - Para aprobar una captura bancaria deben existir: (1) identidad bancaria verificable por logo/marca visible O por el código bancario de una CLABE válida, (2) nombre del titular y (3) CLABE interbancaria de 18 dígitos.
+  - NO adivines el banco sólo por colores o estilo visual de la app. Si ves logo/texto explícito, guárdalo; el backend validará de forma determinista el banco usando los primeros 3 dígitos de la CLABE.
+  - Guarda el banco visualmente detectado en fields.banco, indica fields.bankLogoDetected=true sólo cuando el logo/marca sea realmente identificable, fields.bankLogoText con el texto o marca detectada y fields.isBankAppScreenshot=true cuando sea captura/foto de pantalla.
   - Guarda la CLABE en fields.clabe sólo con 18 dígitos, aun si visualmente aparece separada con espacios o guiones.
-  - No basta con un número de cuenta: para aprobación automática de este campo debe existir CLABE de 18 dígitos.
+  - No basta con un número de cuenta: para aprobación automática de este campo debe existir CLABE de 18 dígitos y su dígito verificador debe ser válido.
   - El nombre del titular debe corresponder al nombre esperado del driver ignorando acentos y diferencias menores de OCR.
   - No exijas periodo, fecha de corte ni formato de estado de cuenta tradicional cuando la evidencia provenga de banca móvil/web.
+  - Si no puedes identificar visualmente la entidad bancaria, NO inventes una. Devuelve la CLABE y deja que el backend resuelva el banco por los primeros 3 dígitos cuando el código exista en el catálogo.
 - Si el documento esperado es Comprobante de domicilio, valida únicamente que sea un comprobante real/válido, legible y que contenga domicilio/emisor/periodo o datos suficientes. No lo rechaces si está a nombre de otra persona.
 - REGLAS ESPECIALES PARA TARJETA DE CIRCULACIÓN / PERMISO GUBERNAMENTAL:
   - Además de una tarjeta de circulación, acepta permisos, autorizaciones, constancias o documentos oficiales emitidos por CUALQUIER autoridad gubernamental federal, estatal o municipal, siempre que el archivo sea legible y tenga formato oficial reconocible.
@@ -432,8 +438,11 @@ function localMockValidation({ fieldName, file, rule, expectedName, jobId }) {
 
   const fields = {
     banco: fieldName === "estado_cuenta" && ok ? "BANCO DEMO" : null,
-    clabe: fieldName === "estado_cuenta" && ok ? "012345678901234567" : null,
+    clabe: fieldName === "estado_cuenta" && ok ? "012345678901234568" : null,
     cuenta: fieldName === "estado_cuenta" && ok ? "1234567890" : null,
+    bankLogoDetected: fieldName === "estado_cuenta" && ok ? true : null,
+    bankLogoText: fieldName === "estado_cuenta" && ok ? "BANCO DEMO" : null,
+    isBankAppScreenshot: fieldName === "estado_cuenta" && ok ? hasAnyToken(originalName, ["captura", "screenshot", "app", "pantalla"]) : null,
     curp: fieldName === "curp" && ok ? "CURPDEMO000000HDFXXX00" : null,
     rfc: fieldName === "constancia" && ok ? "RFCDEMO000XXX" : null,
     nss: fieldName === "nss_file" && ok ? "12345678901" : null,
@@ -618,6 +627,105 @@ function buildSelfieVerification(fields = {}) {
   };
 }
 
+
+function nullableBool(value) {
+  if (value === true || value === false) return value;
+  const text = String(value ?? "").trim().toLowerCase();
+  if (["true", "1", "si", "sí", "yes"].includes(text)) return true;
+  if (["false", "0", "no"].includes(text)) return false;
+  return null;
+}
+
+function bankScreenshotEvidence(result, expectedName) {
+  const fields = result?.fields || {};
+  const logoDetected = nullableBool(fields.bankLogoDetected ?? fields.logo_banco_detectado ?? fields.logo_detectado);
+  const logoText = firstNonEmpty(fields.bankLogoText, fields.logo_banco, fields.marca_banco, fields.logo_text);
+  const visualBank = firstNonEmpty(
+    fields.banco,
+    fields.bank,
+    fields.institucion,
+    fields.institucion_bancaria,
+    fields.entidad_financiera,
+    fields.emisor,
+    fields.banco_emisor,
+    logoText
+  );
+
+  const clabeCandidates = [
+    fields.clabe,
+    fields.clabe_interbancaria,
+    fields.clabeInterbancaria,
+    fields.cuenta_clabe,
+    fields.cuentaClabe
+  ].map(normalizeClabe).filter(Boolean);
+
+  const clabe = clabeCandidates.find((candidate) => isValidClabe(candidate)) || clabeCandidates[0] || "";
+  const bankResolution = resolveBankName({ clabe, candidates: [visualBank, logoText] });
+  const bank = bankResolution.name || visualBank;
+
+  // Si la CLABE tiene un código bancario conocido, esa fuente prevalece.
+  // Si el código no está catalogado, se exige evidencia visual explícita del banco.
+  const bankIdentityVerified = Boolean(
+    bankResolution.source === "clabe_prefix" ||
+    ((logoDetected === true || Boolean(logoText)) && visualBank)
+  );
+
+  const name = firstNonEmpty(
+    result?.nameFound,
+    fields.nombre,
+    fields.nombre_titular,
+    fields.nombreTitular,
+    fields.titular,
+    fields.ownerName
+  );
+  const nameCheck = computeNameMatch(expectedName, name, result?.nameMatches);
+
+  return {
+    bank,
+    visualBank,
+    bankCode: bankResolution.code || "",
+    bankSource: bankResolution.source,
+    bankMismatch: bankResolution.mismatch,
+    bankIdentityVerified,
+    logoDetected: logoDetected === true || Boolean(logoText),
+    logoText,
+    clabe,
+    clabeValid: isValidClabe(clabe),
+    name,
+    nameMatches: nameCheck.matches,
+  };
+}
+
+function isBankScreenshotIrrelevantIssue(issue, evidence) {
+  if (!evidence?.bank || !evidence?.bankIdentityVerified || !evidence?.name || !evidence?.clabeValid) return false;
+
+  const text = String(issue || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  return (
+    text.includes("periodo") ||
+    text.includes("fecha de corte") ||
+    text.includes("captura de pantalla") ||
+    text.includes("captura de app") ||
+    text.includes("pantalla") ||
+    text.includes("no parece ser estado de cuenta") ||
+    text.includes("no corresponde al formato tradicional") ||
+    text.includes("numero de cuenta") ||
+    (evidence.bankSource === "clabe_prefix" && (
+      text.includes("logo") ||
+      text.includes("marca bancaria") ||
+      text.includes("banco emisor") ||
+      text.includes("no se detecto banco") ||
+      text.includes("no se identifico banco") ||
+      text.includes("no se puede identificar banco") ||
+      text.includes("banco detectado") ||
+      text.includes("banco no coincide")
+    ))
+  );
+}
+
 function hardenResult(raw, { fieldName, rule, expectedName }) {
   const fields = raw.fields && typeof raw.fields === "object" ? raw.fields : {};
   const ownerCandidate = firstNonEmpty(
@@ -645,8 +753,41 @@ function hardenResult(raw, { fieldName, rule, expectedName }) {
     summary: String(raw.summary || "").slice(0, 500)
   };
 
+  if (fieldName === "estado_cuenta") {
+    const bankEvidence = bankScreenshotEvidence(result, expectedName);
+    result.fields = {
+      ...result.fields,
+      banco: bankEvidence.bank || result.fields?.banco || null,
+      banco_detectado_ia: bankEvidence.visualBank || null,
+      banco_codigo_clabe: bankEvidence.bankCode || null,
+      banco_fuente: bankEvidence.bankSource || null,
+      banco_conflicto_ia_clabe: bankEvidence.bankMismatch === true,
+      clabe: bankEvidence.clabe || result.fields?.clabe || null,
+      bankLogoDetected: bankEvidence.logoDetected,
+      bankLogoText: bankEvidence.logoText || result.fields?.bankLogoText || null,
+    };
+    result.nameFound = bankEvidence.name || result.nameFound;
+    result.nameMatches = bankEvidence.nameMatches;
+
+    if (
+      result.isLegible &&
+      bankEvidence.bankIdentityVerified &&
+      bankEvidence.bank &&
+      bankEvidence.name &&
+      bankEvidence.clabeValid
+    ) {
+      result.isExpectedDocument = true;
+      result.documentTypeDetected = result.documentTypeDetected === "desconocido"
+        ? "captura_o_comprobante_bancario"
+        : result.documentTypeDetected;
+    }
+  }
+
   const ownerCheckApplies = OWNER_OBSERVATION_FIELDS.has(fieldName);
   const nameCheck = computeNameMatch(expectedName, result.nameFound, result.nameMatches);
+  const bankEvidenceForIssues = fieldName === "estado_cuenta"
+    ? bankScreenshotEvidence(result, expectedName)
+    : null;
 
   const rawBlockingIssues = [];
   const warningIssues = [];
@@ -655,6 +796,10 @@ function hardenResult(raw, { fieldName, rule, expectedName }) {
     if (!issue) continue;
 
     if (isIrrelevantFieldIssue(fieldName, issue)) {
+      continue;
+    }
+
+    if (fieldName === "estado_cuenta" && isBankScreenshotIrrelevantIssue(issue, bankEvidenceForIssues)) {
       continue;
     }
 
@@ -677,7 +822,17 @@ function hardenResult(raw, { fieldName, rule, expectedName }) {
 
   if (!result.isExpectedDocument) blockingIssues.push(`El archivo no parece ser ${rule.label}.`);
   if (!result.isLegible) blockingIssues.push("La información del documento no es legible.");
-  if (result.confidence < rule.minConfidence) blockingIssues.push(`Confianza baja (${result.confidence}).`);
+  const strongBankEvidenceForConfidence = fieldName === "estado_cuenta"
+    ? bankScreenshotEvidence(result, expectedName)
+    : null;
+  if (
+    result.confidence < rule.minConfidence &&
+    !(strongBankEvidenceForConfidence?.bankIdentityVerified &&
+      strongBankEvidenceForConfidence?.clabeValid &&
+      strongBankEvidenceForConfidence?.name)
+  ) {
+    blockingIssues.push(`Confianza baja (${result.confidence}).`);
+  }
 
   if (rule.requireNameMatch) {
     if (!result.nameFound) {
@@ -688,9 +843,28 @@ function hardenResult(raw, { fieldName, rule, expectedName }) {
   }
 
   if (fieldName === "estado_cuenta") {
-    const clabeOrCuenta = String(result.fields?.clabe || result.fields?.cuenta || "").replace(/\D/g, "");
-    if (clabeOrCuenta.length < 10) blockingIssues.push("No se detectó CLABE o número de cuenta legible.");
-    if (!result.fields?.banco) blockingIssues.push("No se detectó banco emisor.");
+    const bankEvidence = bankScreenshotEvidence(result, expectedName);
+
+    if (!bankEvidence.bank) {
+      blockingIssues.push("No se detectó banco emisor.");
+    }
+    if (!bankEvidence.bankIdentityVerified) {
+      blockingIssues.push("No se pudo identificar el banco por logo/marca ni por el código bancario de la CLABE.");
+    }
+    if (!bankEvidence.name) {
+      blockingIssues.push("No se detectó el nombre del titular.");
+    }
+    if (!bankEvidence.clabe) {
+      blockingIssues.push("No se detectó una CLABE interbancaria de 18 dígitos.");
+    } else if (!bankEvidence.clabeValid) {
+      blockingIssues.push("La CLABE detectada no es válida (dígito verificador incorrecto).");
+    }
+
+    if (bankEvidence.bankMismatch && bankEvidence.visualBank) {
+      warningIssues.push(
+        `El banco detectado visualmente (${bankEvidence.visualBank}) no coincide con el código de la CLABE. Se usará ${bankEvidence.bank}.`
+      );
+    }
   }
 
   const selfieVerification = fieldName === "selfie" ? buildSelfieVerification(result.fields) : null;
@@ -719,10 +893,23 @@ function hardenResult(raw, { fieldName, rule, expectedName }) {
     }
   }
 
-  const documentItselfValid =
-    result.isExpectedDocument &&
-    result.isLegible &&
-    result.confidence >= rule.minConfidence;
+  const bankEvidenceForValidity = fieldName === "estado_cuenta"
+    ? bankScreenshotEvidence(result, expectedName)
+    : null;
+
+  const documentItselfValid = fieldName === "estado_cuenta"
+    ? Boolean(
+        result.isExpectedDocument &&
+        result.isLegible &&
+        bankEvidenceForValidity?.bankIdentityVerified &&
+        bankEvidenceForValidity?.clabeValid &&
+        bankEvidenceForValidity?.name
+      )
+    : Boolean(
+        result.isExpectedDocument &&
+        result.isLegible &&
+        result.confidence >= rule.minConfidence
+      );
 
   let ownerStatus = "not_applicable";
   let severity = "error";

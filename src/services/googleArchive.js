@@ -8,6 +8,7 @@ const { execFile } = require("child_process");
 const { ENV, assertGoogleArchiveConfig } = require("../config/env");
 const { getClients } = require("../lib/google");
 const { generateCredentialPdfFromRow } = require("./credential");
+const { normalizeClabe, isValidClabe, resolveBankName } = require("../utils/clabe");
 
 const execFileAsync = promisify(execFile);
 const TARGET_DRIVE_FILE_BYTES = 5 * 1024 * 1024; // objetivo: no más de 5 MB por archivo en Drive cuando la compresión lo permita
@@ -105,20 +106,18 @@ function extractClabeFromText(value) {
   const text = String(value || "");
   if (!text.trim()) return "";
 
+  const candidates = [];
   const contextual = text.match(/(?:CLABE|CLABE INTERBANCARIA|CUENTA CLABE|INTERBANCARIA)[^\d]*(\d[\d\s-]{16,34}\d)/i);
-  if (contextual?.[1]) {
-    const digits = contextual[1].replace(/\D/g, "");
-    if (digits.length >= 18) return digits.slice(0, 18);
-  }
+  if (contextual?.[1]) candidates.push(normalizeClabe(contextual[1]));
 
   const contiguous = text.match(/\b\d{18}\b/);
-  if (contiguous?.[0]) return contiguous[0];
+  if (contiguous?.[0]) candidates.push(normalizeClabe(contiguous[0]));
 
   const compact = text.replace(/[^\d]/g, "");
   const mostlyDigits = text.replace(/[\d\s-]/g, "").trim().length <= 3;
-  if (mostlyDigits && compact.length >= 18) return compact.slice(0, 18);
+  if (mostlyDigits && compact.length >= 18) candidates.push(normalizeClabe(compact));
 
-  return "";
+  return candidates.find((candidate) => isValidClabe(candidate)) || "";
 }
 
 function getEstadoCuentaRow(reviewPayload = {}) {
@@ -736,8 +735,12 @@ function buildSheetRow({ localResult, googleFiles, driverFolder, bodyData, revie
   const status = rowStatus || (summary.canContinue ? (summary.warnings ? "APROBADO_CON_OBSERVACIONES" : "APROBADO") : "CON_ERRORES");
   const bankFromReview = extractBankFromReview(reviewPayload);
   const clabeFromReview = extractClabeFromReview(reviewPayload);
-  const banco = normalizeBankName(bodyData.banco || bankFromReview);
   const clabe = extractClabeFromText(bodyData.clabeTxt || bodyData.clabe || clabeFromReview);
+  const bankResolution = resolveBankName({
+    clabe,
+    candidates: [bankFromReview, bodyData.banco],
+  });
+  const banco = normalizeBankName(bankResolution.name || bankFromReview || bodyData.banco);
   const nss = normalizeNssForSheet(bodyData.nssNum || bodyData.nss_num || extractNssFromReview(reviewPayload));
   const rfc = normalizeRfc(bodyData.rfc || extractRfcFromReview(reviewPayload));
   const rejectedDetail = detailRowsByStatus(reviewPayload, "rejected");
